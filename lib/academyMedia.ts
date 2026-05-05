@@ -1,0 +1,32 @@
+export const academyMedia = {
+  hero: "/images/FB/bah251123001_bad_v_mia-11.jpg",
+  juniorsCard: "/images/juniors/j1.jpg",
+  aboutCard: "/images/FB/bah251123001_sfscl-34.jpg",
+  aboutStory: "/images/FB/bah2511230001_bad_at_mia5620.jpg",
+  gallerySquare: [
+    "/images/juniors/j1.jpg",
+    "/images/juniors/j2.jpg",
+    "/images/juniors/j3.jpg",
+    "/images/juniors/j4.jpg",
+    "/images/juniors/j5.jpg",
+    "/images/juniors/j6.jpg",
+    "/images/juniors/j7.jpg",
+    "/images/juniors/j9.jpg",
+    "/images/juniors/j10.jpg",
+    "/images/juniors/j11.jpg",
+    "/images/juniors/j12.jpg",
+  ],
+  managementPhotos: [
+    "/images/FB/bah251123001_bad_v_mia-11.jpg",
+    "/images/FB/bah251123001_bad_v_mia-29.jpg",
+    "/images/FB/bah251123001_bad_v_mia-58.jpg",
+    "/images/FB/bah251123001_bad_v_mia-70.jpg",
+    "/images/FB/bah251123001_bad_v_mia-93.jpg",
+    "/images/FB/bah251123001_bad_v_mia-101.jpg",
+    "/images/FB/bah251123001_bad_v_mia-107.jpg",
+    "/images/FB/bah251123001_bad_v_mia-110.jpg",
+    "/images/FB/bah251123001_sfscl-71.jpg",
+    "/images/FB/bah251123001_sfscl-88.jpg",
+  ],
+};
+

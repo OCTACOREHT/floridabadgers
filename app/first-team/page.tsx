@@ -56,7 +56,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function FirstTeamPage() {
   return (
-    <main className="pt-[66px]">
+    <main className="">
       <section className="relative overflow-hidden bg-slate-900 text-white">
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-800/70" />
@@ -70,7 +70,7 @@ export default function FirstTeamPage() {
           />
         </div>
 
-        <div className="relative z-10 max-w-[1320px] mx-auto px-6 xl:px-10 py-20 lg:py-24 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="relative z-10 max-w-[1320px] mx-auto px-6 xl:px-10 pt-32 pb-20 grid lg:grid-cols-2 gap-12 items-center">
           <div>
             <SectionLabel>Men&apos;s First Team</SectionLabel>
             <h1 className="text-4xl sm:text-5xl xl:text-6xl font-black uppercase tracking-tight leading-[1.05]">

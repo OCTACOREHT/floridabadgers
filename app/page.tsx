@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, type Variants } from "framer-motion";
+import { motion, type Variants, AnimatePresence } from "framer-motion";
 import { ArrowRight, Calendar, MapPin, Phone, Mail, Trophy, Users, Star, ChevronRight } from "lucide-react";
 import { newsArticles } from "@/lib/news";
 import {
@@ -12,6 +13,10 @@ import {
   RiTeamLine,
   RiTimerFlashLine,
   RiUserStarLine,
+  RiFacebookFill,
+  RiTwitterXFill,
+  RiInstagramLine,
+  RiYoutubeFill,
 } from "@remixicon/react";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
@@ -96,9 +101,52 @@ const stagger: Variants = {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-slate-500 mb-3">
+    <span className="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-white/70 mb-3">
       {children}
     </span>
+  );
+}
+
+const heroImages = [
+  "/images/FB/bah251123001_bad_v_mia-33.jpg",
+  "/images/FB/bah251123001_bad_v_mia-79.jpg",
+  "/images/FB/bah251123001_bad_v_mia-84.jpg",
+];
+
+function HeroBackgroundSlider() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % heroImages.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 z-0">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={index}
+          initial={{ opacity: 0, scale: 1.05 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.2, ease: "easeInOut" }}
+          className="absolute inset-0"
+        >
+          <Image
+            src={heroImages[index]}
+            alt="Florida Badgers FCA action"
+            fill
+            className="object-cover object-center"
+            priority={index === 0}
+          />
+        </motion.div>
+      </AnimatePresence>
+      {/* Extremely subtle overlay to ensure text readability without hiding images */}
+      <div className="absolute inset-0 bg-black/5 z-10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-900/60 via-slate-900/10 to-transparent z-10" />
+    </div>
   );
 }
 
@@ -106,15 +154,15 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function Home() {
   return (
-    <main className="pt-[66px] lg:pt-[66px]">
+    <main className="">
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <section className="relative min-h-[92vh] flex items-center overflow-hidden bg-slate-900">
-        {/* Background gradient */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/85 to-slate-800/60 z-10" />
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-900 to-transparent z-10" />
-          {/* Decorative grid */}
+      <section className="relative min-h-screen flex items-center overflow-hidden bg-slate-900">
+        <HeroBackgroundSlider />
+
+        {/* Decorative grid overlay */}
+        <div className="absolute inset-0 z-10 pointer-events-none">
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-900 to-transparent" />
           <div
             className="absolute inset-0 opacity-[0.04]"
             style={{
@@ -126,16 +174,16 @@ export default function Home() {
         </div>
 
         {/* Content */}
-        <div className="relative z-20 max-w-[1320px] mx-auto px-6 xl:px-10 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="relative z-20 max-w-[1320px] w-full mx-auto px-6 xl:px-10 pt-24 pb-12">
           <motion.div
             initial="hidden"
             animate="show"
             variants={stagger}
-            className="flex flex-col gap-6"
+            className="flex flex-col gap-6 max-w-2xl"
           >
             <motion.div variants={fadeUp}>
-              <SectionLabel>UPSL Florida South Zone II</SectionLabel>
-              <h1 className="text-5xl md:text-6xl xl:text-7xl font-black uppercase leading-[1.05] tracking-tight">
+              <SectionLabel><span className="invisible">UPSL Florida South Zone II</span></SectionLabel>
+              <h1 className="text-5xl md:text-6xl xl:text-7xl font-black uppercase leading-[1.05] tracking-tight text-white drop-shadow-xl">
                 Florida
                 <br />
                 <span className="text-white">Badgers</span>
@@ -146,7 +194,7 @@ export default function Home() {
 
             <motion.p
               variants={fadeUp}
-              className="text-white/70 text-lg max-w-md leading-relaxed"
+              className="text-white text-lg max-w-md leading-relaxed font-bold drop-shadow-md"
             >
               Our mission is to provide a platform for talented and motivated young
               soccer players to grow, compete, and succeed — both on the field and in
@@ -157,50 +205,39 @@ export default function Home() {
               <Link href="/academy" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-7 py-4 transition-all hover:bg-[#374151] hover:gap-3">
                 Join the Academy <ArrowRight size={16} />
               </Link>
-              <Link href="/schedule" className="inline-flex items-center gap-2 border border-white/30 text-white font-bold text-sm uppercase tracking-wider px-7 py-4 transition-all hover:border-white hover:text-white">
+              <Link href="/schedule" className="inline-flex items-center gap-2 border border-white/40 text-white font-bold text-sm uppercase tracking-wider px-7 py-4 transition-all hover:border-white hover:text-white bg-white/5 backdrop-blur-sm">
                 Match Schedule
               </Link>
             </motion.div>
 
-            <motion.div variants={fadeUp} className="flex gap-8 pt-2">
+            <motion.div variants={fadeUp} className="flex gap-8 pt-4">
               {[
                 { value: "2018", label: "Founded" },
                 { value: "6", label: "Academy Groups" },
-                { value: "UPSL", label: "League" },
+                { value: "UPSL", label: "League", logo: "/images/UPSL.png" },
               ].map((s) => (
-                <div key={s.label}>
-                  <div className="text-2xl font-black text-white">{s.value}</div>
-                  <div className="text-xs text-white/50 uppercase tracking-widest mt-1">{s.label}</div>
+                <div key={s.label} className="flex items-center gap-3">
+                  {s.logo && (
+                    <div className="relative w-12 h-12 flex-shrink-0">
+                      <Image
+                        src={s.logo}
+                        alt={`${s.value} Logo`}
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-2xl font-black text-white">{s.value}</div>
+                    <div className="text-xs text-white/60 uppercase tracking-widest mt-1">{s.label}</div>
+                  </div>
                 </div>
               ))}
             </motion.div>
           </motion.div>
-
-          {/* Logo right side */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-            className="hidden lg:flex items-center justify-center"
-          >
-            <div className="relative w-72 h-72 xl:w-96 xl:h-96">
-              <div className="absolute inset-0 bg-[#1e3a5f]/10 rounded-full blur-3xl" />
-              <Image
-                src="/images/Florida Badgers.png"
-                alt="Florida Badgers FCA"
-                fill
-                className="object-contain drop-shadow-2xl relative z-10"
-                priority
-              />
-            </div>
-          </motion.div>
         </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 opacity-40">
-          <div className="w-px h-12 bg-gradient-to-b from-transparent to-white/70" />
-          <span className="text-[10px] uppercase tracking-widest text-white/70">Scroll</span>
-        </div>
+
       </section>
 
       {/* ═══════════════════════ RECENT RESULTS ═══════════════════════ */}
@@ -348,7 +385,7 @@ export default function Home() {
               meaningful club — now known as Florida Badgers.
             </motion.p>
             <motion.div variants={fadeUp} className="flex gap-4">
-              <Link href="/about" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#374151] transition-all">
+              <Link href="/academy/about" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#374151] transition-all">
                 Read More <ArrowRight size={15} />
               </Link>
               <Link href="/league" className="inline-flex items-center gap-2 border border-white/20 text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:border-white hover:text-white transition-all">
@@ -588,6 +625,7 @@ export default function Home() {
               { label: "Home", href: "/" },
               { label: "News", href: "/news" },
               { label: "Contacts", href: "/contacts" },
+              { label: "Privacy Policy", href: "/privacy-policy" },
               { label: "Shop", href: "/shop" },
               { label: "Support our mission", href: "/support" },
               { label: "Team", href: "/team" },
@@ -600,19 +638,20 @@ export default function Home() {
 
           <div className="flex gap-4">
             {[
-              { label: "FB", href: "https://www.facebook.com/share/1BBXhVuuEU/" },
-              { label: "X", href: "https://x.com/flbadgersfc" },
-              { label: "IG", href: "https://www.instagram.com/floridabadgersfc" },
-              { label: "YT", href: "https://www.youtube.com/@FloridaBadgersfc" },
+              { icon: <RiFacebookFill size={16} />, href: "https://www.facebook.com/share/1BBXhVuuEU/", label: "Facebook" },
+              { icon: <RiTwitterXFill size={16} />, href: "https://x.com/flbadgersfc", label: "X" },
+              { icon: <RiInstagramLine size={16} />, href: "https://www.instagram.com/floridabadgersfc", label: "Instagram" },
+              { icon: <RiYoutubeFill size={16} />, href: "https://www.youtube.com/@FloridaBadgersfc", label: "YouTube" },
             ].map((s) => (
               <a
                 key={s.label}
                 href={s.href}
                 target="_blank"
                 rel="noreferrer"
-                className="w-8 h-8 flex items-center justify-center border border-white/20 text-white/50 hover:border-white hover:text-white text-xs font-bold transition-all"
+                className="w-8 h-8 flex items-center justify-center border border-white/20 text-white/50 hover:border-white hover:text-white transition-all"
+                aria-label={s.label}
               >
-                {s.label}
+                {s.icon}
               </a>
             ))}
           </div>

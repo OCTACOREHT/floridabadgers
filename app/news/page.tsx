@@ -23,14 +23,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function NewsPage() {
   return (
-    <main className="pt-[66px]">
-      <section className="bg-slate-100 px-6 xl:px-10 py-20 border-b border-slate-200">
+    <main className="">
+      <section className="bg-slate-900 px-6 xl:px-10 pt-32 pb-20 border-b border-white/10">
         <div className="max-w-[1320px] mx-auto">
           <SectionLabel>News</SectionLabel>
-          <h1 className="text-4xl sm:text-5xl xl:text-6xl font-black uppercase tracking-tight text-slate-800 leading-[1.02]">
+          <h1 className="text-4xl sm:text-5xl xl:text-6xl font-black uppercase tracking-tight text-white leading-[1.02]">
             The Latest News
           </h1>
-          <p className="mt-4 text-slate-600 max-w-2xl leading-relaxed">
+          <p className="mt-4 text-white/70 max-w-2xl leading-relaxed">
             Follow Florida Badgers FCA updates across the first team, academy, and club development.
           </p>
         </div>
