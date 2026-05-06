@@ -44,14 +44,14 @@ export default function AdminHomePage() {
           return (
             <Card key={action.title} className="h-full border-border/70 bg-card">
               <CardHeader>
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-black text-white">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
                   <Icon className="size-5" />
                 </div>
                 <CardTitle>{action.title}</CardTitle>
                 <CardDescription>{action.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild className="w-full bg-black text-white hover:bg-zinc-800">
+                <Button asChild className="w-full shadow-sm">
                   <Link href={action.href}>
                     Open <ArrowRight />
                   </Link>

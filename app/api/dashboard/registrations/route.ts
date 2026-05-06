@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDashboardRegistrationRows } from "@/lib/dashboard/data";
+import { requireApiUser } from "@/lib/auth/api-guard";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,9 @@ function parseLimit(value: string | null): number {
 }
 
 export async function GET(request: NextRequest) {
+  const guardResponse = await requireApiUser(request);
+  if (guardResponse) return guardResponse;
+
   try {
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
     const data = await getDashboardRegistrationRows(limit);
@@ -21,4 +25,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

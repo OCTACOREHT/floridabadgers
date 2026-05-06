@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { requireApiUser } from "@/lib/auth/api-guard";
 import {
   getDashboardTableConfig,
   getDashboardTableRows,
@@ -18,6 +19,9 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ table: string }> }
 ) {
+  const guardResponse = await requireApiUser(request);
+  if (guardResponse) return guardResponse;
+
   const { table } = await context.params;
   const config = getDashboardTableConfig(table);
   if (!config) {
@@ -40,6 +44,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ table: string }> }
 ) {
+  const guardResponse = await requireApiUser(request);
+  if (guardResponse) return guardResponse;
+
   const { table } = await context.params;
   const config = getDashboardTableConfig(table);
   if (!config) {
@@ -72,4 +79,3 @@ export async function POST(
     );
   }
 }
-

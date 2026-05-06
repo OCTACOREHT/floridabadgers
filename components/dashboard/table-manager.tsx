@@ -1,11 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EyeIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import {
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  Trash2Icon,
+} from "lucide-react";
 
 import type { DashboardTableConfig, DashboardTableField } from "@/lib/dashboard/tables";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -147,6 +155,7 @@ function buildFormFromRow(
 
 export function DashboardTableManager({ config, initialRows }: Props) {
   const [rows, setRows] = useState<Record<string, unknown>[]>(initialRows);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [tableError, setTableError] = useState<string | null>(null);
 
@@ -186,6 +195,21 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     () => Object.fromEntries(visibleFields.map((field) => [field.key, field.label])),
     [visibleFields]
   );
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredRows = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return rows;
+    }
+
+    return rows.filter((row) => {
+      const haystack = Object.entries(row)
+        .flatMap(([key, value]) => [key, fieldLabelByKey[key] ?? key, formatValue(value)])
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearchTerm);
+    });
+  }, [fieldLabelByKey, normalizedSearchTerm, rows]);
 
   const updateValue = (key: string, value: unknown) => {
     setPanelValues((prev) => ({ ...prev, [key]: value }));
@@ -491,15 +515,43 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   };
 
   return (
-    <div className="px-4 pb-6 lg:px-6">
+    <div className="px-4 pb-6 pt-4 lg:px-6">
+      <div className="mb-5 flex flex-col gap-2 pl-1 pt-1">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{config.label}</h1>
+            <p className="text-sm text-muted-foreground">{config.description}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <Link
+              href="/dashboard"
+              className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Dashboard
+            </Link>
+            <span className="text-muted-foreground/50">/</span>
+            <span className="font-semibold text-primary">{config.label}</span>
+          </div>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle>{config.label}</CardTitle>
-              <CardDescription>{config.description}</CardDescription>
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative w-full max-w-xl">
+              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder={`Search ${config.label.toLowerCase()}...`}
+                aria-label={`Search ${config.label}`}
+                className="h-10 pl-9"
+              />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="hidden text-sm text-muted-foreground md:block">
+                {filteredRows.length} of {rows.length} rows
+              </div>
               <Button type="button" variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
                 <RefreshCwIcon className="mr-1 size-4" />
                 {isRefreshing ? "Refreshing..." : "Refresh"}
@@ -531,8 +583,14 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                     No rows found.
                   </TableCell>
                 </TableRow>
+              ) : filteredRows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={listColumns.length + 1} className="py-8 text-center text-muted-foreground">
+                    No matching rows found.
+                  </TableCell>
+                </TableRow>
               ) : (
-                rows.map((row) => {
+                filteredRows.map((row) => {
                   const id = String(row.id ?? "");
                   return (
                     <TableRow key={id}>

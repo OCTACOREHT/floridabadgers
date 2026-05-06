@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+import Image from "next/image"
 
 import { NavAdmin } from "@/components/nav-admin"
 import { NavMain } from "@/components/nav-main"
@@ -12,10 +14,9 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ClipboardListIcon, ChartSplineIcon, GoalIcon, UsersIcon, Settings2Icon, CommandIcon } from "lucide-react"
+import { LayoutDashboardIcon, ClipboardListIcon, ChartSplineIcon, GoalIcon, UsersIcon, Settings2Icon } from "lucide-react"
 
 const data = {
   user: {
@@ -65,15 +66,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
-              <a href="/dashboard">
-                <CommandIcon className="size-5!" />
-                <span className="text-base font-semibold">Florida Badgers</span>
-              </a>
-            </SidebarMenuButton>
+              <Image
+                src="/images/Florida Badgers.png"
+                alt="Florida Badgers"
+                width={40}
+                height={40}
+                className="block h-10 w-10 shrink-0 object-contain"
+                priority
+              />
+              <span className="text-base font-semibold leading-none">Florida Badgers</span>
+            </Link>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

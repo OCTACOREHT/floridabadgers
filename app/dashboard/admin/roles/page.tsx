@@ -38,7 +38,7 @@ export default function AdminRolesPage() {
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-border/70">
           <CardHeader>
-            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-black text-white">
+            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <ShieldUser className="size-5" />
             </div>
             <CardTitle>Role assignments</CardTitle>
@@ -67,7 +67,7 @@ export default function AdminRolesPage() {
             <p className="text-sm text-muted-foreground">
               Use the users table when you need to add a person, update the assigned role, or review account details.
             </p>
-            <Button asChild className="w-full bg-black text-white hover:bg-zinc-800">
+            <Button asChild className="w-full shadow-sm">
               <Link href="/dashboard/tables/users">
                 Open Users <ArrowRight />
               </Link>

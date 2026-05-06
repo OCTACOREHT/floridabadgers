@@ -1,17 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getDashboardTableConfig, normalizeTablePayload } from "@/lib/dashboard/tables";
+import { requireApiUser } from "@/lib/auth/api-guard";
 
 export const runtime = "nodejs";
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ table: string; id: string }> }
 ) {
+  const guardResponse = await requireApiUser(request);
+  if (guardResponse) return guardResponse;
+
   const { table, id } = await context.params;
   const config = getDashboardTableConfig(table);
   if (!config) {
     return NextResponse.json({ error: "Unsupported table." }, { status: 404 });
+  }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: "Invalid row id." }, { status: 400 });
   }
 
   try {
@@ -43,13 +55,20 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ table: string; id: string }> }
 ) {
+  const guardResponse = await requireApiUser(request);
+  if (guardResponse) return guardResponse;
+
   const { table, id } = await context.params;
   const config = getDashboardTableConfig(table);
   if (!config) {
     return NextResponse.json({ error: "Unsupported table." }, { status: 404 });
+  }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: "Invalid row id." }, { status: 400 });
   }
 
   try {
@@ -67,4 +86,3 @@ export async function DELETE(
     );
   }
 }
-

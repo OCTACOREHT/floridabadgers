@@ -50,12 +50,14 @@ const navItems: NavItem[] = [
 export function Navbar() {
   const pathname = usePathname();
   const isDashboardRoute = pathname?.startsWith("/dashboard");
+  const isAuthRoute = pathname?.startsWith("/admin") || pathname?.startsWith("/login");
+  const shouldHideNavbar = isDashboardRoute || isAuthRoute;
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileAcademyOpen, setMobileAcademyOpen] = useState(false);
 
   useEffect(() => {
-    if (isDashboardRoute) {
+    if (shouldHideNavbar) {
       return;
     }
 
@@ -78,9 +80,9 @@ export function Navbar() {
       window.removeEventListener("scroll", handleScroll);
       scrollContainer?.removeEventListener("scroll", handleScroll);
     };
-  }, [isDashboardRoute, pathname]);
+  }, [pathname, shouldHideNavbar]);
 
-  if (isDashboardRoute) {
+  if (shouldHideNavbar) {
     return null;
   }
 

@@ -32,7 +32,7 @@ export function NavMain({
             <SidebarMenuButton
               asChild
               tooltip="Quick Create"
-              className="min-w-8 bg-[#1e3a5f] text-white duration-100 ease-out hover:bg-[#274a78] hover:text-white active:bg-[#274a78] active:text-white"
+              className="min-w-8 rounded-[14px] border border-amber-300/40 bg-amber-400 text-slate-950 shadow-[0_10px_24px_rgba(245,158,11,0.22)] duration-150 ease-out hover:bg-amber-300 hover:text-slate-950 hover:shadow-[0_12px_28px_rgba(245,158,11,0.28)] active:scale-[0.99]"
             >
               <Link href="/dashboard/tables">
                 <CirclePlusIcon />

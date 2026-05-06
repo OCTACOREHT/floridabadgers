@@ -14,11 +14,17 @@ function sanitize(value: unknown, maxLength = 300): string | null {
   return trimmed.slice(0, maxLength);
 }
 
+function isValidPath(path: string): boolean {
+  if (!path.startsWith("/")) return false;
+  if (path.includes("://")) return false;
+  return !/\s/.test(path);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as TrackPayload;
     const path = sanitize(body.path, 250);
-    if (!path) {
+    if (!path || !isValidPath(path)) {
       return NextResponse.json({ error: "Missing path." }, { status: 400 });
     }
 

@@ -333,7 +333,9 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
   const supabase = createSupabaseServiceClient();
   const safeLimit = Math.max(1, Math.min(limit, 300));
 
-  const selectColumns = Array.from(new Set(["id", ...config.listColumns]));
+  const selectColumns = Array.from(
+    new Set(["id", ...config.listColumns, ...config.createFields.map((field) => field.key)])
+  );
   const selectExpr = selectColumns.join(", ");
 
   const { data, error } = await supabase

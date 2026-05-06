@@ -25,7 +25,7 @@ export default function AdminPasswordPage() {
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <Card className="border-border/70">
           <CardHeader>
-            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-black text-white">
+            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <KeyRound className="size-5" />
             </div>
             <CardTitle>Reset workflow</CardTitle>
@@ -36,7 +36,7 @@ export default function AdminPasswordPage() {
           <CardContent className="space-y-3">
             {steps.map((step, index) => (
               <div key={step} className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[11px] font-semibold text-white">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
                   {index + 1}
                 </div>
                 <p className="text-sm text-foreground">{step}</p>
@@ -47,7 +47,7 @@ export default function AdminPasswordPage() {
 
         <Card className="border-border/70">
           <CardHeader>
-            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-black text-white">
+            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <LockKeyhole className="size-5" />
             </div>
             <CardTitle>Security note</CardTitle>
@@ -62,7 +62,7 @@ export default function AdminPasswordPage() {
                 When you wire this to Supabase Auth or a server action, keep it restricted to admin users only.
               </p>
             </div>
-            <Button asChild className="w-full bg-black text-white hover:bg-zinc-800">
+            <Button asChild className="w-full shadow-sm">
               <Link href="/dashboard/tables/users">
                 Open Users <ArrowRight />
               </Link>
