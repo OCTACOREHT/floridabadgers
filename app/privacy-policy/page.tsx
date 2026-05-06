@@ -150,7 +150,7 @@ export default function PrivacyPolicyPage() {
           <SectionTitle number={5} title="Who Has Access To Your Data" />
           <Paragraph>
             If you are not a registered user, we do not keep account-specific profile data about you. If you have
-            a registered account, authorized administrators and support staff may access relevant information when
+            a registered account, authorized support staff may access relevant information when
             needed to operate the service and provide support.
           </Paragraph>
 
@@ -216,4 +216,3 @@ export default function PrivacyPolicyPage() {
     </main>
   );
 }
-

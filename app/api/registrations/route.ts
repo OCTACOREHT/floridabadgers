@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { trackSiteEvent } from "@/lib/analytics/events";
 
 type RegistrationInput = {
+  programme_inscription:
+    | "junior_foundation"
+    | "junior_development"
+    | "junior_elite"
+    | "stage_english";
   nom_complet: string;
   date_naissance: string;
   sexe: "Masculin" | "Feminin";
@@ -37,6 +43,21 @@ type LegacyValueSet = {
   poste_jeu: string;
   niveau_jeu: string;
 };
+
+const JUNIOR_PROGRAMS = new Set<RegistrationInput["programme_inscription"]>([
+  "junior_foundation",
+  "junior_development",
+  "junior_elite",
+]);
+
+function isRegistrationProgram(value: unknown): value is RegistrationInput["programme_inscription"] {
+  return (
+    value === "junior_foundation" ||
+    value === "junior_development" ||
+    value === "junior_elite" ||
+    value === "stage_english"
+  );
+}
 
 function calculateAge(dateOfBirth: string): number {
   const birthDate = new Date(dateOfBirth);
@@ -111,6 +132,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as Partial<RegistrationInput>;
 
     const requiredFields = [
+      "programme_inscription",
       "nom_complet",
       "date_naissance",
       "sexe",
@@ -140,18 +162,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!isRegistrationProgram(body.programme_inscription)) {
+      return NextResponse.json({ error: "Invalid registration program." }, { status: 400 });
+    }
+
     if (!isUuid(body.categorie_id as string)) {
       return NextResponse.json({ error: "Invalid category." }, { status: 400 });
     }
+
+    const isStageRegistration = body.programme_inscription === "stage_english";
+    const isJuniorRegistration = JUNIOR_PROGRAMS.has(body.programme_inscription);
 
     const age = calculateAge(body.date_naissance as string);
     if (Number.isNaN(age) || age < 6 || age > 60) {
       return NextResponse.json({ error: "Invalid date of birth." }, { status: 400 });
     }
 
+    if (isJuniorRegistration && age >= 18) {
+      return NextResponse.json(
+        { error: "Junior registration is only for players under 18. Choose Stage (English) for adults." },
+        { status: 400 }
+      );
+    }
+
     const isMinor = age < 18;
-    const parentName = normalizeText(body.nom_parent_tuteur);
-    const parentPhone = normalizeText(body.telephone_parent_tuteur);
+    const parentName = isMinor ? normalizeText(body.nom_parent_tuteur) : "";
+    const parentPhone = isMinor ? normalizeText(body.telephone_parent_tuteur) : "";
     if (isMinor && (!parentName || !parentPhone || body.autorisation_parentale !== true)) {
       return NextResponse.json(
         { error: "For minors, parent/tutor info and parental authorization are required." },
@@ -160,6 +196,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = {
+      programme_inscription: body.programme_inscription,
       nom_complet: normalizeText(body.nom_complet),
       date_naissance: body.date_naissance,
       age,
@@ -173,8 +210,8 @@ export async function POST(request: NextRequest) {
       club_actuel: normalizeText(body.club_actuel) || null,
       experience_football: normalizeText(body.experience_football) || null,
       categorie_id: body.categorie_id,
-      inscrit_par: body.inscrit_par,
-      relation_avec_joueur: normalizeText(body.relation_avec_joueur) || null,
+      inscrit_par: isMinor ? body.inscrit_par : "joueur",
+      relation_avec_joueur: isMinor ? normalizeText(body.relation_avec_joueur) || null : null,
       probleme_sante: Boolean(body.probleme_sante),
       probleme_sante_details: normalizeText(body.probleme_sante_details) || null,
       allergies_connues: normalizeText(body.allergies_connues) || null,
@@ -185,21 +222,45 @@ export async function POST(request: NextRequest) {
       contact_urgence_adresse: normalizeText(body.contact_urgence_adresse) || null,
       nom_parent_tuteur: parentName || null,
       telephone_parent_tuteur: parentPhone || null,
-      autorisation_parentale: Boolean(body.autorisation_parentale),
+      autorisation_parentale: isMinor ? Boolean(body.autorisation_parentale) : false,
       consentement_soins_urgence: Boolean(body.consentement_soins_urgence),
       accepte_regles_stage: Boolean(body.accepte_regles_stage),
       confirme_infos_correctes: Boolean(body.confirme_infos_correctes),
     };
 
     const supabase = createSupabaseServiceClient();
+    const targetTable = isStageRegistration ? "inscriptions_stage" : "inscriptions_joueurs";
+
     const { data, error } = await supabase
-      .from("inscriptions_joueurs")
+      .from(targetTable)
       .insert(payload)
       .select("id, created_at, statut")
       .single();
 
     if (!error) {
+      await trackSiteEvent({
+        eventType: "registration_submitted",
+        path: "/join",
+        source: "registration-api",
+        metadata: {
+          registrationId: data.id,
+          targetTable,
+          programme: body.programme_inscription,
+        },
+      });
+
       return NextResponse.json({ success: true, registration: data }, { status: 201 });
+    }
+
+    if (isStageRegistration) {
+      return NextResponse.json(
+        {
+          error:
+            error.message ??
+            "Stage registration failed. Ensure the 'inscriptions_stage' table exists and migrations are applied.",
+        },
+        { status: 500 }
+      );
     }
 
     if (!shouldFallbackToLegacy(error)) {
@@ -218,15 +279,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    const emergencySummary = JSON.stringify({
-      nom: normalizeText(body.contact_urgence_nom),
-      telephone: normalizeText(body.contact_urgence_telephone),
-      relation: normalizeText(body.contact_urgence_relation),
-      email: normalizeText(body.contact_urgence_email) || null,
-      adresse: normalizeText(body.contact_urgence_adresse) || null,
-      consentement_soins_urgence: Boolean(body.consentement_soins_urgence),
-    });
 
     const legacyCandidates = buildLegacyValueCandidates(body as RegistrationInput);
 
@@ -253,7 +305,6 @@ export async function POST(request: NextRequest) {
         autorisation_parentale: Boolean(body.autorisation_parentale),
         accepte_regles_stage: Boolean(body.accepte_regles_stage),
         confirme_infos_correctes: Boolean(body.confirme_infos_correctes),
-        note_admin: `urgence:${emergencySummary}`,
       };
 
       const legacyInsert = await supabase
@@ -263,6 +314,18 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!legacyInsert.error) {
+        await trackSiteEvent({
+          eventType: "registration_submitted",
+          path: "/join",
+          source: "registration-api",
+          metadata: {
+            registrationId: legacyInsert.data.id,
+            targetTable: "inscriptions_joueurs",
+            programme: body.programme_inscription,
+            legacySchema: true,
+          },
+        });
+
         return NextResponse.json({ success: true, registration: legacyInsert.data, legacy: true }, { status: 201 });
       }
     }

@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
+import { Poppins, Geist } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { SiteTracker } from "@/components/SiteTracker";
+import { cn } from "@/lib/utils";
 
-const montserrat = Montserrat({
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
+const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  variable: "--font-montserrat",
+  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });
 
@@ -22,11 +25,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={montserrat.variable}>
-      <body
-        className="antialiased"
-        style={{ fontFamily: "var(--font-montserrat), sans-serif" }}
-      >
+    <html lang="en" className={cn(poppins.className, "font-sans", geist.variable)}>
+      <body className="bg-slate-100 text-slate-900 antialiased">
+        <SiteTracker />
         <Navbar />
         {children}
       </body>

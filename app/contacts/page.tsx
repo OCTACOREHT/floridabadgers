@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, MapPin, Phone, Clock, ArrowRight } from "lucide-react";
+import { ContactForm } from "@/components/ContactForm";
 
 export const metadata: Metadata = {
   title: "Contact | Florida Badgers FCA",
@@ -69,68 +70,7 @@ export default function ContactsPage() {
               Send Us A Message
             </h2>
 
-            <form className="grid sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-1">
-                <label htmlFor="name" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  className="w-full border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-500"
-                  placeholder="Your full name"
-                />
-              </div>
-
-              <div className="sm:col-span-1">
-                <label htmlFor="email" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  className="w-full border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-500"
-                  placeholder="you@example.com"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="subject" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-                  Subject
-                </label>
-                <input
-                  id="subject"
-                  name="subject"
-                  type="text"
-                  className="w-full border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-500"
-                  placeholder="How can we help?"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="message" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-                  Message
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  rows={6}
-                  className="w-full border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-500 resize-y"
-                  placeholder="Write your message..."
-                />
-              </div>
-
-              <div className="sm:col-span-2 pt-2">
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold uppercase tracking-wider px-7 py-3.5 hover:bg-[#374151] transition-all"
-                >
-                  Send Message <ArrowRight size={15} />
-                </button>
-              </div>
-            </form>
+            <ContactForm />
           </article>
 
           <article className="border border-slate-200 bg-slate-900 text-white p-6 sm:p-8">
@@ -177,4 +117,3 @@ export default function ContactsPage() {
     </main>
   );
 }
-

@@ -7,7 +7,7 @@ create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   full_name text not null,
   email text unique not null,
-  role text default 'user' check (role in ('admin', 'player', 'user')),
+  role text default 'user' check (role in ('player', 'user')),
   photo_url text,
   created_at timestamptz default now()
 );
@@ -119,9 +119,8 @@ create table if not exists inscriptions_joueurs (
   accepte_regles_stage boolean not null default false,
   confirme_infos_correctes boolean not null default false,
 
-  -- Gestion admin
+  -- Suivi interne
   statut text default 'en_attente' check (statut in ('en_attente', 'accepte', 'refuse')),
-  note_admin text,
   created_at timestamptz default now(),
 
   constraint chk_parent_info_for_minors

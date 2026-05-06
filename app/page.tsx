@@ -113,6 +113,45 @@ const heroImages = [
   "/images/FB/bah251123001_bad_v_mia-84.jpg",
 ];
 
+// ─── NEXT MATCH CONFIG ── update before each game ───────────────────────────
+const NEXT_MATCH = {
+  opponent: "FC Florida",
+  venue: "Broward College North",
+  date: "2026-06-07T19:00:00-04:00",
+};
+
+type CountdownTime = { days: number; hours: number; minutes: number; seconds: number };
+const EMPTY_COUNTDOWN: CountdownTime = { days: 0, hours: 0, minutes: 0, seconds: 0 };
+
+function useCountdown(targetDate: string): CountdownTime {
+  const [time, setTime] = useState<CountdownTime>(EMPTY_COUNTDOWN);
+
+  useEffect(() => {
+    const targetTime = new Date(targetDate).getTime();
+
+    const update = () => {
+      const diff = targetTime - Date.now();
+      if (diff <= 0) {
+        setTime(EMPTY_COUNTDOWN);
+        return;
+      }
+
+      setTime({
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
+        minutes: Math.floor((diff % 3600000) / 60000),
+        seconds: Math.floor((diff % 60000) / 1000),
+      });
+    };
+
+    update();
+    const timerId = window.setInterval(update, 1000);
+    return () => window.clearInterval(timerId);
+  }, [targetDate]);
+
+  return time;
+}
+
 function HeroBackgroundSlider() {
   const [index, setIndex] = useState(0);
 
@@ -153,11 +192,19 @@ function HeroBackgroundSlider() {
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const countdown = useCountdown(NEXT_MATCH.date);
+  const opponentWords = NEXT_MATCH.opponent.toUpperCase().split(" ");
+  const opponentTopLine = opponentWords[0] ?? "";
+  const opponentBottomLine = opponentWords.slice(1).join(" ");
+
   return (
-    <main className="">
+    <main
+      id="home-scroll-root"
+      className="h-screen overflow-y-auto snap-y snap-mandatory lg:h-auto lg:overflow-visible lg:snap-none"
+    >
 
       {/* ═══════════════════════ HERO ═══════════════════════ */}
-      <section className="relative min-h-screen flex items-center overflow-hidden bg-slate-900">
+      <section className="relative min-h-screen snap-start flex items-center overflow-hidden bg-slate-900">
         <HeroBackgroundSlider />
 
         {/* Decorative grid overlay */}
@@ -174,74 +221,136 @@ export default function Home() {
         </div>
 
         {/* Content */}
-        <div className="relative z-20 max-w-[1320px] w-full mx-auto px-6 xl:px-10 pt-24 pb-12">
-          <motion.div
-            initial="hidden"
-            animate="show"
-            variants={stagger}
-            className="flex flex-col gap-6 max-w-2xl"
-          >
-            <motion.div variants={fadeUp}>
-              <SectionLabel><span className="invisible">UPSL Florida South Zone II</span></SectionLabel>
-              <h1 className="text-5xl md:text-6xl xl:text-7xl font-black uppercase leading-[1.05] tracking-tight text-white drop-shadow-xl">
-                Florida
-                <br />
-                <span className="text-white">Badgers</span>
-                <br />
-                FCA
-              </h1>
-            </motion.div>
+        <div className="relative z-20 max-w-[1320px] w-full mx-auto px-5 sm:px-6 xl:px-10 pt-14 sm:pt-24 pb-4 sm:pb-12">
+          <div className="flex flex-col lg:flex-row items-start sm:items-center lg:items-end justify-between gap-4 sm:gap-10 min-h-[calc(100svh-7rem)] lg:min-h-0">
 
-            <motion.p
-              variants={fadeUp}
-              className="text-white text-lg max-w-md leading-relaxed font-bold drop-shadow-md"
+            {/* Left — Main copy */}
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={stagger}
+              className="flex flex-col gap-4 sm:gap-6 max-w-2xl w-full mt-4 sm:mt-0"
             >
-              Our mission is to provide a platform for talented and motivated young
-              soccer players to grow, compete, and succeed — both on the field and in
-              life.
-            </motion.p>
+              <motion.div variants={fadeUp}>
+                <SectionLabel><span className="invisible">UPSL Florida South Zone II</span></SectionLabel>
+                <h1 className="text-5xl sm:text-5xl md:text-6xl xl:text-7xl font-black uppercase leading-[1.03] tracking-tight text-white drop-shadow-xl">
+                  Florida
+                  <br />
+                  <span className="text-white">Badgers</span>
+                  <br />
+                  FCA
+                </h1>
+              </motion.div>
 
-            <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
-              <Link href="/academy" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-7 py-4 transition-all hover:bg-[#374151] hover:gap-3">
-                Join the Academy <ArrowRight size={16} />
-              </Link>
-              <Link href="/schedule" className="inline-flex items-center gap-2 border border-white/40 text-white font-bold text-sm uppercase tracking-wider px-7 py-4 transition-all hover:border-white hover:text-white bg-white/5 backdrop-blur-sm">
-                Match Schedule
-              </Link>
+              <motion.p
+                variants={fadeUp}
+                className="text-white text-lg sm:text-lg max-w-md leading-relaxed font-bold drop-shadow-md"
+              >
+                Our mission is to provide a platform for talented and motivated young
+                soccer players to grow, compete, and succeed — both on the field and in
+                life.
+              </motion.p>
+
+              <motion.div variants={fadeUp} className="flex flex-wrap gap-3 sm:gap-4">
+                <Link href="/academy" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm sm:text-sm uppercase tracking-wider px-6 sm:px-7 py-3 sm:py-4 transition-all hover:bg-[#374151] hover:gap-3">
+                  Join the Academy <ArrowRight size={16} />
+                </Link>
+                <Link href="/schedule" className="inline-flex items-center gap-2 border border-white/40 text-white font-bold text-sm sm:text-sm uppercase tracking-wider px-6 sm:px-7 py-3 sm:py-4 transition-all hover:border-white hover:text-white bg-white/5 backdrop-blur-sm">
+                  Match Schedule
+                </Link>
+              </motion.div>
+
+              <motion.div variants={fadeUp} className="flex w-full justify-center sm:justify-start gap-4 sm:gap-8 pt-1 sm:pt-4">
+                {[
+                  { value: "2018", label: "Founded" },
+                  { value: "6", label: "Academy Groups" },
+                  { value: "UPSL", label: "League", logo: "/images/UPSL.png" },
+                ].map((s) => (
+                  <div key={s.label} className="flex items-center gap-2 sm:gap-3">
+                    {s.logo && (
+                      <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
+                        <Image
+                          src={s.logo}
+                          alt={`${s.value} Logo`}
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-xl sm:text-2xl font-black text-white">{s.value}</div>
+                      <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-widest mt-1">{s.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
             </motion.div>
 
-            <motion.div variants={fadeUp} className="flex gap-8 pt-4">
-              {[
-                { value: "2018", label: "Founded" },
-                { value: "6", label: "Academy Groups" },
-                { value: "UPSL", label: "League", logo: "/images/UPSL.png" },
-              ].map((s) => (
-                <div key={s.label} className="flex items-center gap-3">
-                  {s.logo && (
-                    <div className="relative w-12 h-12 flex-shrink-0">
-                      <Image
-                        src={s.logo}
-                        alt={`${s.value} Logo`}
-                        fill
-                        className="object-contain"
-                      />
+            {/* Right — Match Ticket */}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.7 }}
+              className="w-full max-w-[430px] sm:w-fit sm:max-w-full flex-shrink-0 mt-auto sm:mt-auto lg:mt-0"
+            >
+              <div
+                className="relative overflow-hidden rounded-[6px] border border-[#30415c]"
+                style={{ background: "rgba(32,45,67,0.96)", backdropFilter: "blur(10px)" }}
+              >
+                <div className="grid grid-cols-[auto_auto_auto] items-stretch h-full">
+                  <div className="pl-3.5 pr-1.5 sm:pl-4 sm:pr-2 md:pl-4 md:pr-2 pt-2.5 pb-2 sm:pt-2.5 sm:pb-2 md:pt-2.5 md:pb-2 flex flex-col justify-start text-left">
+                    <p className="text-[7px] sm:text-[7px] md:text-[8px] uppercase tracking-[0.16em] text-[#7d8ca3] leading-[1.05]">
+                      Next Match
+                    </p>
+                    <p className="mt-1 text-[16px] sm:text-[16px] md:text-[22px] uppercase font-bold tracking-[0.01em] text-white leading-[0.9]">
+                      VS {opponentTopLine}
+                      {opponentBottomLine && (
+                        <>
+                          <br />
+                          {opponentBottomLine}
+                        </>
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="relative flex items-center justify-center px-0.5 sm:px-1">
+                    <div className="absolute inset-y-2 md:inset-y-3 left-1/2 -translate-x-1/2 border-l-4 border-dotted border-[#081324]" />
+                  </div>
+
+                  <div className="pl-2.5 pr-1.5 sm:pl-2.5 sm:pr-1.5 md:pl-3 md:pr-2 pt-2.5 pb-2 sm:pt-2.5 sm:pb-2 md:pt-2.5 md:pb-2 flex flex-col justify-start">
+                    <div className="grid grid-cols-4 gap-1.5 sm:gap-2 md:gap-2.5">
+                      {[
+                        { label: "Days", value: countdown.days },
+                        { label: "Hrs", value: countdown.hours },
+                        { label: "Mins", value: countdown.minutes },
+                        { label: "Secs", value: countdown.seconds },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex flex-col items-center justify-center">
+                          <span className="text-[24px] sm:text-[20px] md:text-[28px] font-bold tabular-nums text-white leading-none">
+                            {String(value).padStart(2, "0")}
+                          </span>
+                          <span className="mt-0.5 text-[6px] sm:text-[6px] md:text-[7px] uppercase tracking-[0.08em] text-[#7f8ba0]">
+                            {label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  <div>
-                    <div className="text-2xl font-black text-white">{s.value}</div>
-                    <div className="text-xs text-white/60 uppercase tracking-widest mt-1">{s.label}</div>
+                    <p className="mt-1.5 text-center md:text-right text-[5px] sm:text-[5px] md:text-[6px] uppercase tracking-[0.16em] text-[#6e7b8f]">
+                      {NEXT_MATCH.venue}
+                    </p>
                   </div>
                 </div>
-              ))}
+              </div>
             </motion.div>
-          </motion.div>
+
+          </div>
         </div>
 
 
       </section>
 
       {/* ═══════════════════════ RECENT RESULTS ═══════════════════════ */}
-      <section className="bg-white py-20 px-6 xl:px-10">
+      <section className="bg-white py-20 px-6 xl:px-10 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -298,7 +407,7 @@ export default function Home() {
       </section>
 
       {/* NEWS */}
-      <section className="bg-slate-100 py-16 px-6 xl:px-10 border-t border-slate-200">
+      <section className="bg-slate-100 py-16 px-6 xl:px-10 border-t border-slate-200 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -360,7 +469,7 @@ export default function Home() {
         </div>
       </section>
       {/* ═══════════════════════ MISSION ═══════════════════════ */}
-      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden">
+      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden snap-start min-h-screen lg:min-h-0">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
         <div className="max-w-[1320px] mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <motion.div
@@ -418,7 +527,7 @@ export default function Home() {
       </section>
 
       {/* ═══════════════════════ SQUAD ═══════════════════════ */}
-      <section className="bg-white py-24 px-6 xl:px-10">
+      <section className="bg-white py-24 px-6 xl:px-10 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -463,7 +572,7 @@ export default function Home() {
       </section>
 
       {/* ═══════════════════════ ACADEMY ═══════════════════════ */}
-      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden">
+      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden snap-start min-h-screen lg:min-h-0">
         <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
         <div className="max-w-[1320px] mx-auto">
           <motion.div
@@ -549,7 +658,7 @@ export default function Home() {
       </section>
 
       {/* ═══════════════════════ SHOP BANNER ═══════════════════════ */}
-      <section className="bg-white py-16 px-6 xl:px-10 border-t border-slate-200">
+      <section className="bg-white py-16 px-6 xl:px-10 border-t border-slate-200 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Official Merchandise</div>
@@ -573,7 +682,7 @@ export default function Home() {
       </section>
 
       {/* ═══════════════════════ CONTACT ═══════════════════════ */}
-      <section className="bg-slate-800 py-20 px-6 xl:px-10 border-t border-white/10">
+      <section className="bg-slate-800 py-20 px-6 xl:px-10 border-t border-white/10 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto grid md:grid-cols-3 gap-8">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">

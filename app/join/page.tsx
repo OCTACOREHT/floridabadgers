@@ -11,6 +11,11 @@ type Category = {
 };
 
 type RegistrationForm = {
+  programme_inscription:
+    | "junior_foundation"
+    | "junior_development"
+    | "junior_elite"
+    | "stage_english";
   nom_complet: string;
   date_naissance: string;
   sexe: "Masculin" | "Feminin";
@@ -19,6 +24,8 @@ type RegistrationForm = {
   email: string;
   poste_jeu: "Gardien" | "Defenseur" | "Milieu" | "Attaquant";
   niveau_jeu: "Debutant" | "Intermediaire" | "Avance";
+  stage_periode: "weekend" | "holiday_camp" | "evening_sessions";
+  stage_objectif: "technique" | "tactique" | "preparation_physique" | "gardien";
   club_actuel: string;
   experience_football: string;
   categorie_id: string;
@@ -48,7 +55,45 @@ const steps = [
   { title: "Review", subtitle: "Confirm and submit" },
 ];
 
+const REGISTRATION_PROGRAMS: Array<{
+  value: RegistrationForm["programme_inscription"];
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "junior_foundation",
+    label: "Club Registration",
+    description: "A parent/guardian can register a player, or the player can register directly.",
+  },
+  {
+    value: "stage_english",
+    label: "Stage Registration",
+    description: "A single stage form with stage-specific fields.",
+  },
+];
+
+const REGISTRATION_PROGRAM_BADGES: Record<RegistrationForm["programme_inscription"], string> = {
+  junior_foundation: "Club",
+  junior_development: "Club",
+  junior_elite: "Club",
+  stage_english: "Stage",
+};
+
+const STAGE_PERIODES: Array<{ value: RegistrationForm["stage_periode"]; label: string }> = [
+  { value: "weekend", label: "Weekend Session" },
+  { value: "holiday_camp", label: "Holiday Camp Session" },
+  { value: "evening_sessions", label: "Evening Session" },
+];
+
+const STAGE_OBJECTIFS: Array<{ value: RegistrationForm["stage_objectif"]; label: string }> = [
+  { value: "technique", label: "Technical Development" },
+  { value: "tactique", label: "Tactical Understanding" },
+  { value: "preparation_physique", label: "Physical Preparation" },
+  { value: "gardien", label: "Goalkeeper Focus" },
+];
+
 const initialForm: RegistrationForm = {
+  programme_inscription: "junior_foundation",
   nom_complet: "",
   date_naissance: "",
   sexe: "Masculin",
@@ -57,6 +102,8 @@ const initialForm: RegistrationForm = {
   email: "",
   poste_jeu: "Milieu",
   niveau_jeu: "Intermediaire",
+  stage_periode: "weekend",
+  stage_objectif: "technique",
   club_actuel: "",
   experience_football: "",
   categorie_id: "",
@@ -144,6 +191,55 @@ export default function JoinPage() {
 
   const age = useMemo(() => calculateAge(form.date_naissance), [form.date_naissance]);
   const isMinor = typeof age === "number" && age < 18;
+  const isStageRegistration = form.programme_inscription === "stage_english";
+  const isJuniorRegistration = !isStageRegistration;
+  const availableCategories = useMemo(() => {
+    if (isStageRegistration) {
+      return categories;
+    }
+    return categories.filter(
+      (category) => !/(18|plus|senior)/i.test(`${category.nom} ${category.description ?? ""}`)
+    );
+  }, [categories, isStageRegistration]);
+  const selectedCategoryId = useMemo(() => {
+    if (availableCategories.length === 0) return "";
+    return availableCategories.some((category) => category.id === form.categorie_id)
+      ? form.categorie_id
+      : availableCategories[0].id;
+  }, [availableCategories, form.categorie_id]);
+  const stageAutoCategory = useMemo(() => {
+    if (!age || !isStageRegistration || categories.length === 0) {
+      return null;
+    }
+
+    const matchByPattern = (pattern: RegExp) =>
+      categories.find((category) => pattern.test(`${category.nom} ${category.description ?? ""}`));
+
+    if (age <= 10) return matchByPattern(/8|9|10|u10/i) ?? null;
+    if (age <= 13) return matchByPattern(/11|12|13|u13/i) ?? null;
+    if (age <= 17) return matchByPattern(/14|15|16|17|u17/i) ?? null;
+    return matchByPattern(/18|senior|plus|adult/i) ?? null;
+  }, [age, categories, isStageRegistration]);
+  const resolvedCategoryId = isStageRegistration
+    ? stageAutoCategory?.id ?? selectedCategoryId
+    : selectedCategoryId;
+  const resolvedCategoryLabel = useMemo(() => {
+    const found = categories.find((category) => category.id === resolvedCategoryId);
+    return found?.nom ?? "-";
+  }, [categories, resolvedCategoryId]);
+  const displaySteps = useMemo(
+    () =>
+      steps.map((item, index) => {
+        if (index === 1 && isStageRegistration) {
+          return { ...item, title: "Stage Profile", subtitle: "Program objective and level" };
+        }
+        if (index === 3 && !isMinor) {
+          return { ...item, title: "Consent", subtitle: "Adult consent and emergency approval" };
+        }
+        return item;
+      }),
+    [isMinor, isStageRegistration]
+  );
 
   useEffect(() => {
     let active = true;
@@ -178,6 +274,17 @@ export default function JoinPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function selectProgram(program: RegistrationForm["programme_inscription"]) {
+    setForm((prev) => ({
+      ...prev,
+      programme_inscription: program,
+      inscrit_par: "parent_tuteur",
+      relation_avec_joueur: "",
+    }));
+    setStep(0);
+    setFormError("");
+  }
+
   function validateCurrentStep(currentStep: number): string | null {
     if (currentStep === 0) {
       if (!form.nom_complet.trim()) return "Full name is required.";
@@ -186,9 +293,16 @@ export default function JoinPage() {
       if (!form.telephone.trim()) return "Phone number is required.";
       if (!form.email.trim()) return "Email is required.";
       if (!age || age < 6 || age > 60) return "Date of birth is invalid for registration.";
+      if (isJuniorRegistration && age >= 18) {
+        return "Club registration is for under-18 players. Adults should use Stage registration.";
+      }
     }
     if (currentStep === 1) {
-      if (!form.categorie_id) return "Please choose a category.";
+      if (!resolvedCategoryId) return "Please choose a category.";
+      if (isStageRegistration) {
+        if (!form.stage_periode) return "Please choose a stage period.";
+        if (!form.stage_objectif) return "Please choose a stage objective.";
+      }
     }
     if (currentStep === 2) {
       if (!form.contact_urgence_nom.trim()) return "Emergency contact name is required.";
@@ -202,7 +316,9 @@ export default function JoinPage() {
     }
     if (currentStep === 4) {
       if (!form.consentement_soins_urgence) return "Emergency care consent is required.";
-      if (!form.accepte_regles_stage) return "You must accept club rules.";
+      if (!form.accepte_regles_stage) {
+        return isStageRegistration ? "You must accept stage rules." : "You must accept club rules.";
+      }
       if (!form.confirme_infos_correctes) return "You must confirm all information is correct.";
     }
     return null;
@@ -237,13 +353,15 @@ export default function JoinPage() {
     try {
       const payload = {
         ...form,
+        programme_inscription: form.programme_inscription,
+        categorie_id: resolvedCategoryId,
         nom_complet: form.nom_complet.trim(),
         adresse: form.adresse.trim(),
         telephone: form.telephone.trim(),
         email: form.email.trim(),
         club_actuel: form.club_actuel.trim() || null,
         experience_football: form.experience_football.trim() || null,
-        relation_avec_joueur: form.relation_avec_joueur.trim() || null,
+        relation_avec_joueur: isMinor ? form.relation_avec_joueur.trim() || null : null,
         probleme_sante_details: form.probleme_sante_details.trim() || null,
         allergies_connues: form.allergies_connues.trim() || null,
         contact_urgence_nom: form.contact_urgence_nom.trim(),
@@ -251,8 +369,10 @@ export default function JoinPage() {
         contact_urgence_relation: form.contact_urgence_relation.trim(),
         contact_urgence_email: form.contact_urgence_email.trim() || null,
         contact_urgence_adresse: form.contact_urgence_adresse.trim() || null,
-        nom_parent_tuteur: form.nom_parent_tuteur.trim() || null,
-        telephone_parent_tuteur: form.telephone_parent_tuteur.trim() || null,
+        inscrit_par: isMinor ? form.inscrit_par : "joueur",
+        nom_parent_tuteur: isMinor ? form.nom_parent_tuteur.trim() || null : null,
+        telephone_parent_tuteur: isMinor ? form.telephone_parent_tuteur.trim() || null : null,
+        autorisation_parentale: isMinor ? form.autorisation_parentale : false,
       };
 
       const response = await fetch("/api/registrations", {
@@ -285,11 +405,21 @@ export default function JoinPage() {
         <div className="relative max-w-[1320px] mx-auto">
           <div className="text-xs font-bold uppercase tracking-[0.24em] text-white/70 mb-3">Register</div>
           <h1 className="text-4xl sm:text-5xl xl:text-6xl font-black uppercase tracking-tight leading-[1.02]">
-            Junior Registration
+            {isStageRegistration ? "Stage Registration" : "Club Registration"}
           </h1>
           <p className="mt-4 text-white/75 max-w-2xl leading-relaxed">
-            Complete the step-by-step form to register a player. Parent category selection and emergency contact are included.
+            {isStageRegistration
+              ? "Complete the stage registration form."
+              : "Complete the club registration form. Parent details are required for minors."}
           </p>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white">
+              {isStageRegistration ? "Stage Form" : "Junior Form"}
+            </span>
+            <span className="inline-flex items-center border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white">
+              {typeof age === "number" ? (isMinor ? "Minor Player" : "Adult Player") : "Age Pending"}
+            </span>
+          </div>
         </div>
       </section>
 
@@ -298,7 +428,7 @@ export default function JoinPage() {
           <aside className="bg-white border border-slate-200 p-5 h-fit">
             <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Progress</div>
             <div className="space-y-3">
-              {steps.map((item, index) => {
+              {displaySteps.map((item, index) => {
                 const done = index < step;
                 const active = index === step;
                 return (
@@ -333,9 +463,60 @@ export default function JoinPage() {
                 );
               })}
             </div>
+            <div className="mt-6 border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Selected Program</div>
+              <div className="text-sm font-black uppercase tracking-wide text-slate-900">
+                {REGISTRATION_PROGRAMS.find((program) => program.value === form.programme_inscription)?.label ?? "-"}
+              </div>
+              <div className="mt-2 text-xs text-slate-600 leading-relaxed">
+                {REGISTRATION_PROGRAMS.find((program) => program.value === form.programme_inscription)?.description}
+              </div>
+            </div>
           </aside>
 
           <article className="bg-white border border-slate-200 p-5 sm:p-7">
+            <div className="mb-7 border border-slate-200 bg-slate-50 p-4 sm:p-5">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Choose Registration Type</div>
+              <div className="grid sm:grid-cols-2 xl:grid-cols-2 gap-3">
+                {REGISTRATION_PROGRAMS.map((program) => {
+                  const selected = form.programme_inscription === program.value;
+                  const badge = REGISTRATION_PROGRAM_BADGES[program.value];
+                  const stage = program.value === "stage_english";
+                  return (
+                    <button
+                      key={program.value}
+                      type="button"
+                      onClick={() => selectProgram(program.value)}
+                      className={`text-left border p-4 transition-all ${
+                        selected
+                          ? "border-[#1e3a5f] bg-white shadow-[0_0_0_1px_rgba(30,58,95,0.15)]"
+                          : "border-slate-200 bg-white hover:border-slate-400"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                            stage ? "bg-slate-900 text-white" : "bg-[#1e3a5f] text-white"
+                          }`}
+                        >
+                          {badge}
+                        </span>
+                        {selected && (
+                          <span className="text-[10px] font-black uppercase tracking-wider text-[#1e3a5f]">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-black uppercase tracking-wide text-slate-900">{program.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-slate-600">
+                Parent/guardian and player can both use the club form. Stage has one separate form.
+              </p>
+            </div>
+
             <AnimatePresence mode="wait">
               <motion.div
                 key={step}
@@ -348,6 +529,14 @@ export default function JoinPage() {
                   <div>
                     <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">Player Information</h2>
                     <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
+                        <div className="border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Selected Type</div>
+                          <div className="text-sm font-black uppercase tracking-wide text-slate-900">
+                            {REGISTRATION_PROGRAMS.find((program) => program.value === form.programme_inscription)?.label}
+                          </div>
+                        </div>
+                      </div>
                       <div className="sm:col-span-2">
                         <FieldLabel>Full Name</FieldLabel>
                         <Input value={form.nom_complet} onChange={(e) => update("nom_complet", e.target.value)} />
@@ -382,7 +571,9 @@ export default function JoinPage() {
 
                 {step === 1 && (
                   <div>
-                    <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">Football Profile</h2>
+                    <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">
+                      {isStageRegistration ? "Stage Profile" : "Club Profile"}
+                    </h2>
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <FieldLabel>Position</FieldLabel>
@@ -405,39 +596,84 @@ export default function JoinPage() {
                         <FieldLabel>Current Club</FieldLabel>
                         <Input value={form.club_actuel} onChange={(e) => update("club_actuel", e.target.value)} />
                       </div>
-                      <div>
-                        <FieldLabel>Registered By</FieldLabel>
-                        <Select
-                          value={form.inscrit_par}
-                          onChange={(e) => update("inscrit_par", e.target.value as RegistrationForm["inscrit_par"])}
-                        >
-                          <option value="parent_tuteur">Parent / Tuteur</option>
-                          <option value="joueur">Joueur</option>
-                        </Select>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <FieldLabel>Relation with player (if parent/tutor)</FieldLabel>
-                        <Input value={form.relation_avec_joueur} onChange={(e) => update("relation_avec_joueur", e.target.value)} />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <FieldLabel>Category</FieldLabel>
-                        {loadingCategories ? (
-                          <div className="border border-slate-300 px-4 py-3 text-sm text-slate-500">Loading categories...</div>
-                        ) : categoryError ? (
-                          <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{categoryError}</div>
-                        ) : (
-                          <Select
-                            value={form.categorie_id}
-                            onChange={(e) => update("categorie_id", e.target.value)}
-                          >
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.nom}
-                              </option>
-                            ))}
-                          </Select>
-                        )}
-                      </div>
+                      {isStageRegistration ? (
+                        <>
+                          <div>
+                            <FieldLabel>Stage Period</FieldLabel>
+                            <Select
+                              value={form.stage_periode}
+                              onChange={(e) => update("stage_periode", e.target.value as RegistrationForm["stage_periode"])}
+                            >
+                              {STAGE_PERIODES.map((stagePeriod) => (
+                                <option key={stagePeriod.value} value={stagePeriod.value}>
+                                  {stagePeriod.label}
+                                </option>
+                              ))}
+                            </Select>
+                          </div>
+                          <div>
+                            <FieldLabel>Stage Objective</FieldLabel>
+                            <Select
+                              value={form.stage_objectif}
+                              onChange={(e) => update("stage_objectif", e.target.value as RegistrationForm["stage_objectif"])}
+                            >
+                              {STAGE_OBJECTIFS.map((objectif) => (
+                                <option key={objectif.value} value={objectif.value}>
+                                  {objectif.label}
+                                </option>
+                              ))}
+                            </Select>
+                          </div>
+                          <div className="sm:col-span-2 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                            Stage group is assigned automatically from player age:{" "}
+                            <span className="font-bold text-slate-900">{resolvedCategoryLabel}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {isMinor ? (
+                            <>
+                              <div>
+                                <FieldLabel>Registered By</FieldLabel>
+                                <Select
+                                  value={form.inscrit_par}
+                                  onChange={(e) => update("inscrit_par", e.target.value as RegistrationForm["inscrit_par"])}
+                                >
+                                  <option value="parent_tuteur">Parent / Guardian</option>
+                                  <option value="joueur">Player</option>
+                                </Select>
+                              </div>
+                              <div className="sm:col-span-2">
+                                <FieldLabel>Relation with player (if parent/tutor)</FieldLabel>
+                                <Input value={form.relation_avec_joueur} onChange={(e) => update("relation_avec_joueur", e.target.value)} />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="sm:col-span-2 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                              Adult registration: parent/tutor options are removed.
+                            </div>
+                          )}
+                          <div className="sm:col-span-2">
+                            <FieldLabel>Category</FieldLabel>
+                            {loadingCategories ? (
+                              <div className="border border-slate-300 px-4 py-3 text-sm text-slate-500">Loading categories...</div>
+                            ) : categoryError ? (
+                              <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{categoryError}</div>
+                            ) : (
+                              <Select
+                                value={selectedCategoryId}
+                                onChange={(e) => update("categorie_id", e.target.value)}
+                              >
+                                {availableCategories.map((category) => (
+                                  <option key={category.id} value={category.id}>
+                                    {category.nom}
+                                  </option>
+                                ))}
+                              </Select>
+                            )}
+                          </div>
+                        </>
+                      )}
                       <div className="sm:col-span-2">
                         <FieldLabel>Football Experience</FieldLabel>
                         <Textarea rows={5} value={form.experience_football} onChange={(e) => update("experience_football", e.target.value)} />
@@ -500,37 +736,43 @@ export default function JoinPage() {
 
                 {step === 3 && (
                   <div>
-                    <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">Parent Consent</h2>
+                    <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">
+                      {isMinor ? "Parent Consent" : "Consent & Authorization"}
+                    </h2>
                     <div className="flex items-start gap-3 border border-slate-200 bg-slate-50 p-4 mb-6">
                       <ShieldAlert size={18} className="text-[#1e3a5f] mt-0.5" />
                       <p className="text-sm text-slate-700">
                         {isMinor
                           ? "This player is a minor. Parent/tutor details and parental authorization are mandatory."
-                          : "Player is 18+. Parent/tutor details are optional but recommended."}
+                          : "Player is 18+. Parent/tutor fields are removed automatically."}
                       </p>
                     </div>
 
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div>
-                        <FieldLabel>Parent / Tutor Name</FieldLabel>
-                        <Input value={form.nom_parent_tuteur} onChange={(e) => update("nom_parent_tuteur", e.target.value)} />
+                    {isMinor && (
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <FieldLabel>Parent / Tutor Name</FieldLabel>
+                          <Input value={form.nom_parent_tuteur} onChange={(e) => update("nom_parent_tuteur", e.target.value)} />
+                        </div>
+                        <div>
+                          <FieldLabel>Parent / Tutor Phone</FieldLabel>
+                          <Input value={form.telephone_parent_tuteur} onChange={(e) => update("telephone_parent_tuteur", e.target.value)} />
+                        </div>
                       </div>
-                      <div>
-                        <FieldLabel>Parent / Tutor Phone</FieldLabel>
-                        <Input value={form.telephone_parent_tuteur} onChange={(e) => update("telephone_parent_tuteur", e.target.value)} />
-                      </div>
-                    </div>
+                    )}
 
                     <div className="mt-6 space-y-3">
-                      <label className="flex items-start gap-3 border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={form.autorisation_parentale}
-                          onChange={(e) => update("autorisation_parentale", e.target.checked)}
-                          className="h-4 w-4 mt-0.5 accent-[#1e3a5f]"
-                        />
-                        I authorize the player to register and participate in club activities.
-                      </label>
+                      {isMinor && (
+                        <label className="flex items-start gap-3 border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={form.autorisation_parentale}
+                            onChange={(e) => update("autorisation_parentale", e.target.checked)}
+                            className="h-4 w-4 mt-0.5 accent-[#1e3a5f]"
+                          />
+                          I authorize the player to register and participate in club activities.
+                        </label>
+                      )}
                       <label className="flex items-start gap-3 border border-slate-200 bg-white p-3 text-sm text-slate-700">
                         <input
                           type="checkbox"
@@ -549,6 +791,15 @@ export default function JoinPage() {
                     <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">Review & Submit</h2>
                     <div className="grid sm:grid-cols-2 gap-4 mb-6">
                       <div className="border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Program</div>
+                        <div className="font-bold text-slate-900">
+                          {REGISTRATION_PROGRAMS.find((program) => program.value === form.programme_inscription)?.label ?? "-"}
+                        </div>
+                        <div className="text-sm text-slate-600 mt-1">
+                          {isStageRegistration ? "Stage form (English)" : "Junior club form"}
+                        </div>
+                      </div>
+                      <div className="border border-slate-200 bg-slate-50 p-4">
                         <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Player</div>
                         <div className="font-bold text-slate-900">{form.nom_complet || "-"}</div>
                         <div className="text-sm text-slate-600 mt-1">{form.email || "-"}</div>
@@ -558,9 +809,17 @@ export default function JoinPage() {
                         <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Football</div>
                         <div className="font-bold text-slate-900">{form.poste_jeu} - {form.niveau_jeu}</div>
                         <div className="text-sm text-slate-600 mt-1">Age: {age ?? "-"}</div>
-                        <div className="text-sm text-slate-600">
-                          Category: {categories.find((c) => c.id === form.categorie_id)?.nom ?? "-"}
-                        </div>
+                        <div className="text-sm text-slate-600">Category: {resolvedCategoryLabel}</div>
+                        {isStageRegistration && (
+                          <>
+                            <div className="text-sm text-slate-600 mt-1">
+                              Stage period: {STAGE_PERIODES.find((period) => period.value === form.stage_periode)?.label ?? "-"}
+                            </div>
+                            <div className="text-sm text-slate-600">
+                              Stage objective: {STAGE_OBJECTIFS.find((objectif) => objectif.value === form.stage_objectif)?.label ?? "-"}
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div className="border border-slate-200 bg-slate-50 p-4">
                         <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Emergency</div>
@@ -568,12 +827,20 @@ export default function JoinPage() {
                         <div className="text-sm text-slate-600 mt-1">{form.contact_urgence_telephone || "-"}</div>
                         <div className="text-sm text-slate-600">{form.contact_urgence_relation || "-"}</div>
                       </div>
-                      <div className="border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Parent</div>
-                        <div className="font-bold text-slate-900">{form.nom_parent_tuteur || "-"}</div>
-                        <div className="text-sm text-slate-600 mt-1">{form.telephone_parent_tuteur || "-"}</div>
-                        <div className="text-sm text-slate-600">{isMinor ? "Minor registration" : "Adult registration"}</div>
-                      </div>
+                      {isMinor ? (
+                        <div className="border border-slate-200 bg-slate-50 p-4">
+                          <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Parent</div>
+                          <div className="font-bold text-slate-900">{form.nom_parent_tuteur || "-"}</div>
+                          <div className="text-sm text-slate-600 mt-1">{form.telephone_parent_tuteur || "-"}</div>
+                          <div className="text-sm text-slate-600">Minor registration</div>
+                        </div>
+                      ) : (
+                        <div className="border border-slate-200 bg-slate-50 p-4">
+                          <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Parent</div>
+                          <div className="font-bold text-slate-900">Not required</div>
+                          <div className="text-sm text-slate-600 mt-1">Adult registration</div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3">
@@ -584,7 +851,9 @@ export default function JoinPage() {
                           onChange={(e) => update("accepte_regles_stage", e.target.checked)}
                           className="h-4 w-4 mt-0.5 accent-[#1e3a5f]"
                         />
-                        I accept club rules and training guidelines.
+                        {isStageRegistration
+                          ? "I accept stage rules and participation guidelines."
+                          : "I accept club rules and training guidelines."}
                       </label>
                       <label className="flex items-start gap-3 border border-slate-200 bg-white p-3 text-sm text-slate-700">
                         <input

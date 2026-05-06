@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Montserrat, Oswald } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown } from "lucide-react";
@@ -47,15 +48,41 @@ const navItems: NavItem[] = [
 ];
 
 export function Navbar() {
+  const pathname = usePathname();
+  const isDashboardRoute = pathname?.startsWith("/dashboard");
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileAcademyOpen, setMobileAcademyOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    if (isDashboardRoute) {
+      return;
+    }
+
+    const scrollContainer = document.getElementById("home-scroll-root");
+
+    const getScrollPosition = () => {
+      const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+      if (!isDesktop && scrollContainer) {
+        return scrollContainer.scrollTop;
+      }
+      return window.scrollY;
+    };
+
+    const handleScroll = () => setIsScrolled(getScrollPosition() > 20);
+    handleScroll();
+
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    scrollContainer?.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      scrollContainer?.removeEventListener("scroll", handleScroll);
+    };
+  }, [isDashboardRoute, pathname]);
+
+  if (isDashboardRoute) {
+    return null;
+  }
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
@@ -144,9 +171,11 @@ export function Navbar() {
         </div>
       </header>
 
-      <header className={`lg:hidden fixed top-0 left-0 right-0 z-50 transition-all duration-300 h-14 ${
-        isScrolled ? "bg-white border-b border-slate-200" : "bg-transparent"
-      }`}>
+      <header
+        className={`lg:hidden fixed top-0 left-0 right-0 z-50 h-14 transition-all duration-300 ${
+          isScrolled ? "bg-white border-b border-slate-200 shadow-sm" : "bg-transparent border-b border-transparent"
+        }`}
+      >
         <div className="flex h-full items-center justify-between px-4">
           <Link href="/" className="flex min-w-0 items-center gap-2.5">
             <div className="relative h-12 w-12 flex-shrink-0">
@@ -170,7 +199,9 @@ export function Navbar() {
           </Link>
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className={`p-2 rounded transition ${isScrolled ? "text-slate-700 hover:bg-slate-100" : "text-white hover:bg-white/10"}`}
+            className={`rounded p-2 transition ${
+              isScrolled ? "text-slate-700 hover:bg-slate-100" : "text-white hover:bg-white/10"
+            }`}
             aria-label="Open menu"
           >
             <Menu size={24} />
