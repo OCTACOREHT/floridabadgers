@@ -200,19 +200,13 @@ export default function PrivacyPolicyPage() {
           </Paragraph>
 
           <div className="mt-10 pt-6 border-t border-slate-200">
-            <div className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-3">Florida Badgers FCA</div>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-700">
-              <Link href="/" className="hover:text-slate-900 transition-colors">Home</Link>
-              <Link href="/news" className="hover:text-slate-900 transition-colors">News</Link>
-              <Link href="/contacts" className="hover:text-slate-900 transition-colors">Contacts</Link>
-              <Link href="/shop" className="hover:text-slate-900 transition-colors">Shop</Link>
-              <Link href="/support" className="hover:text-slate-900 transition-colors">Support our mission</Link>
-              <Link href="/team" className="hover:text-slate-900 transition-colors">Team</Link>
-            </div>
-            <p className="text-xs text-slate-500 mt-5">FloridaBadgersFCA © 2026. All Rights Reserved.</p>
+            <p className="text-sm text-slate-700">
+              For privacy questions, please use our contact page or official club email.
+            </p>
           </div>
         </div>
       </section>
     </main>
   );
 }
+

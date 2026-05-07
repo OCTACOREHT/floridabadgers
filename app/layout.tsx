@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins, Geist } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { GlobalFooter } from "@/components/GlobalFooter";
 import { SiteTracker } from "@/components/SiteTracker";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,7 @@ export default function RootLayout({
         <SiteTracker />
         <Navbar />
         {children}
+        <GlobalFooter />
       </body>
     </html>
   );

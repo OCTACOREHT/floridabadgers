@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, type Variants, AnimatePresence } from "framer-motion";
-import { ArrowRight, Calendar, MapPin, Phone, Mail, Trophy, Users, Star, ChevronRight } from "lucide-react";
+import { ArrowRight, Calendar, MapPin, Trophy, Users, Star, ChevronRight } from "lucide-react";
 import { newsArticles } from "@/lib/news";
+import { SiteFooter } from "@/components/SiteFooter";
 import {
   RiAwardLine,
   RiFootballLine,
@@ -13,10 +14,6 @@ import {
   RiTeamLine,
   RiTimerFlashLine,
   RiUserStarLine,
-  RiFacebookFill,
-  RiTwitterXFill,
-  RiInstagramLine,
-  RiYoutubeFill,
 } from "@remixicon/react";
 
 // â”€â”€â”€ DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -905,7 +902,7 @@ export default function Home() {
       </section>
 
       {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SHOP BANNER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="bg-white py-16 px-6 xl:px-10 border-t border-slate-200 snap-start min-h-screen lg:min-h-0">
+      <section className="bg-white py-12 md:py-16 px-6 xl:px-10 border-t border-slate-200 snap-start min-h-0">
         <div className="max-w-[1320px] mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Official Merchandise</div>
@@ -928,91 +925,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• CONTACT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="bg-slate-800 py-20 px-6 xl:px-10 border-t border-white/10 snap-start min-h-screen lg:min-h-0">
-        <div className="max-w-[1320px] mx-auto grid md:grid-cols-3 gap-8">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
-              <MapPin size={18} className="text-white" />
-            </div>
-            <div>
-              <div className="font-bold text-sm uppercase tracking-wider text-white mb-1">Address</div>
-              <div className="text-white/60 text-sm">1901 N. Seacrest Blvd, Boynton Beach FL 33435</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
-              <Phone size={18} className="text-white" />
-            </div>
-            <div>
-              <div className="font-bold text-sm uppercase tracking-wider text-white mb-1">Phone</div>
-              <div className="text-white/60 text-sm">+1 914-426-1526</div>
-              <div className="text-white/60 text-sm">+1 305-988-9700</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
-              <Mail size={18} className="text-white" />
-            </div>
-            <div>
-              <div className="font-bold text-sm uppercase tracking-wider text-white mb-1">Email</div>
-              <div className="text-white/60 text-sm">info@floridabadgersfca.com</div>
-              <div className="text-white/60 text-sm">academy@floridabadgersfca.com</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• FOOTER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <footer className="bg-black py-10 px-6 xl:px-10 border-t border-white/10">
-        <div className="max-w-[1320px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10">
-              <Image src="/images/Florida Badgers.png" alt="Logo" fill className="object-contain" />
-            </div>
-            <div>
-              <div className="font-black text-white text-sm uppercase tracking-wider">Florida Badgers FCA</div>
-              <div className="text-white/40 text-xs">FloridaBadgersFCA (c) 2026. All Rights Reserved.</div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-x-8 gap-y-2 justify-center">
-            {[
-              { label: "Home", href: "/" },
-              { label: "News", href: "/news" },
-              { label: "Contacts", href: "/contacts" },
-              { label: "Privacy Policy", href: "/privacy-policy" },
-              { label: "Shop", href: "/shop" },
-              { label: "Support our mission", href: "/support" },
-              { label: "Team", href: "/team" },
-            ].map((l) => (
-              <Link key={l.label} href={l.href} className="text-white/50 hover:text-white text-xs font-medium uppercase tracking-wider transition-colors">
-                {l.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex gap-4">
-            {[
-              { icon: <RiFacebookFill size={16} />, href: "https://www.facebook.com/share/1BBXhVuuEU/", label: "Facebook" },
-              { icon: <RiTwitterXFill size={16} />, href: "https://x.com/flbadgersfc", label: "X" },
-              { icon: <RiInstagramLine size={16} />, href: "https://www.instagram.com/floridabadgersfc", label: "Instagram" },
-              { icon: <RiYoutubeFill size={16} />, href: "https://www.youtube.com/@FloridaBadgersfc", label: "YouTube" },
-            ].map((s) => (
-              <a
-                key={s.label}
-                href={s.href}
-                target="_blank"
-                rel="noreferrer"
-                className="w-8 h-8 flex items-center justify-center border border-white/20 text-white/50 hover:border-white hover:text-white transition-all"
-                aria-label={s.label}
-              >
-                {s.icon}
-              </a>
-            ))}
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
