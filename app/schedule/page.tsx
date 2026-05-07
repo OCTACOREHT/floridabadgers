@@ -115,13 +115,13 @@ export default async function SchedulePage() {
                           className="object-contain p-0.5 md:p-1"
                         />
                       </div>
-                      <p className="font-black text-slate-900 leading-tight">{fixture.home.name}</p>
+                      <p className="font-black text-sm md:text-[15px] text-slate-900 leading-tight">{fixture.home.name}</p>
                     </div>
 
                     <div className="text-slate-400 font-black text-sm uppercase tracking-widest">vs</div>
 
                     <div className="flex items-center gap-3 min-w-0 justify-end text-right">
-                      <p className="font-black text-slate-900 leading-tight">{fixture.away.name}</p>
+                      <p className="font-black text-sm md:text-[15px] text-slate-900 leading-tight">{fixture.away.name}</p>
                       <div className="relative w-11 h-11 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
                         <Image
                           src={fixture.away.logoUrl || BADGERS_FALLBACK_LOGO}

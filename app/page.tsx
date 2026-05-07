@@ -16,7 +16,7 @@ import {
   RiUserStarLine,
 } from "@remixicon/react";
 
-// â”€â”€â”€ DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DATA
 
 const SCHEDULE_SEASON = 2026;
 const UPSL_LOCAL_LOGO = "/images/UPSL.png";
@@ -27,12 +27,12 @@ const squad = [
   { number: 8, name: "Willdieffson Francois", position: "Right Back" },
   { number: 13, name: "Stephen Jean", position: "Left Back" },
   { number: 6, name: "Jonex Sirius", position: "Midfielder" },
-  { number: 2, name: "WoodmaÃ«l Beauchamps", position: "Central Midfielder" },
+  { number: 2, name: "Woodmael Beauchamps", position: "Central Midfielder" },
   { number: 10, name: "Carl Edens Joseph", position: "Attacking Mid" },
   { number: 11, name: "Altidort", position: "Attacking Mid" },
   { number: 14, name: "John Nalus", position: "Forward" },
   { number: 7, name: "Schimiliquen Castin", position: "Forward" },
-  { number: 2, name: "Bens Deliska", position: "Tight End" },
+  { number: 2, name: "Bens Deliska", position: "Forward" },
 ];
 
 const academyCategories = ["U7", "U9", "U11", "U13", "U15", "U17"];
@@ -47,15 +47,15 @@ const whyChooseIcons = [
 ];
 
 const whyChoose = [
-  { icon: "ðŸ‹ï¸", title: "Professional Training", desc: "Effective training from our professional coaches" },
-  { icon: "ðŸ…", title: "Authority", desc: "Independent referee invited to every game" },
-  { icon: "âš½", title: "Youth Academy", desc: "Great training program for younger players" },
-  { icon: "â±ï¸", title: "Precision & Timing", desc: "Players learn to grasp the game faster" },
-  { icon: "ðŸ¤", title: "Team Unity", desc: "Being a team player has a deeper sense in sports" },
-  { icon: "ðŸ†", title: "Championship", desc: "All our players take part in championships" },
+  { title: "Professional Training", desc: "Effective training from our professional coaches." },
+  { title: "Certified Referees", desc: "Each official match includes certified and independent referees." },
+  { title: "Youth Academy", desc: "A strong development pathway for younger players." },
+  { title: "Precision & Timing", desc: "Players learn how to read the game faster." },
+  { title: "Team Unity", desc: "We build discipline, trust, and teamwork on and off the pitch." },
+  { title: "Championship Mindset", desc: "Every player is prepared to compete at a high level." },
 ];
 
-// â”€â”€â”€ ANIMATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ANIMATIONS
 
 const homeNewsCards = newsArticles.slice(0, 3);
 
@@ -69,7 +69,7 @@ const stagger: Variants = {
   show: { transition: { staggerChildren: 0.1 } },
 };
 
-// â”€â”€â”€ COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// COMPONENTS
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -85,7 +85,7 @@ const heroImages = [
   "/images/FB/bah251123001_bad_v_mia-84.jpg",
 ];
 
-// â”€â”€â”€ NEXT MATCH CONFIG â”€â”€ update before each game â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// NEXT MATCH CONFIG - update before each game
 const DEFAULT_NEXT_MATCH = {
   opponent: "FC Florida",
   venue: "Broward College North",
@@ -248,7 +248,7 @@ function HeroBackgroundSlider() {
   );
 }
 
-// â”€â”€â”€ PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PAGE
 
 export default function Home() {
   const scrollRootRef = useRef<HTMLElement | null>(null);
@@ -321,11 +321,11 @@ export default function Home() {
     <main
       ref={scrollRootRef}
       id="home-scroll-root"
-      className="h-screen overflow-y-auto snap-y snap-mandatory lg:h-auto lg:overflow-visible lg:snap-none"
+      className="h-screen overflow-y-auto"
     >
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• HERO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="relative min-h-screen snap-start flex items-center overflow-hidden bg-slate-900">
+      {/* HERO */}
+      <section className="relative min-h-screen flex items-center overflow-hidden bg-slate-900">
         <HeroBackgroundSlider />
 
         {/* Decorative grid overlay */}
@@ -345,7 +345,7 @@ export default function Home() {
         <div className="relative z-20 max-w-[1320px] w-full mx-auto px-5 sm:px-6 xl:px-10 pt-14 sm:pt-24 pb-4 sm:pb-12">
           <div className="flex flex-col lg:flex-row items-start sm:items-center lg:items-end justify-between gap-4 sm:gap-10 min-h-[calc(100svh-7rem)] lg:min-h-0">
 
-            {/* Left â€” Main copy */}
+            {/* Left - Main copy */}
             <motion.div
               initial="hidden"
               animate="show"
@@ -368,7 +368,7 @@ export default function Home() {
                 className="text-white text-lg sm:text-lg max-w-md leading-relaxed font-bold drop-shadow-md"
               >
                 Our mission is to provide a platform for talented and motivated young
-                soccer players to grow, compete, and succeed â€” both on the field and in
+                soccer players to grow, compete, and succeed - both on the field and in
                 life.
               </motion.p>
 
@@ -407,7 +407,7 @@ export default function Home() {
               </motion.div>
             </motion.div>
 
-            {/* Right â€” Match Ticket */}
+            {/* Right - Match ticket */}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
@@ -470,8 +470,8 @@ export default function Home() {
 
       </section>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• RESULTS & UPCOMING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="bg-white py-20 px-6 xl:px-10 snap-start min-h-screen lg:min-h-0">
+      {/* RESULTS & UPCOMING */}
+      <section className="bg-white py-20 px-6 xl:px-10 min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -651,7 +651,7 @@ export default function Home() {
       </section>
 
       {/* NEWS */}
-      <section className="bg-slate-100 py-16 px-6 xl:px-10 border-t border-slate-200 snap-start min-h-screen lg:min-h-0">
+      <section className="bg-slate-100 py-16 px-6 xl:px-10 border-t border-slate-200 min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -712,8 +712,8 @@ export default function Home() {
           </div>
         </div>
       </section>
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MISSION â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden snap-start min-h-screen lg:min-h-0">
+      {/* MISSION */}
+      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
         <div className="max-w-[1320px] mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <motion.div
@@ -726,7 +726,7 @@ export default function Home() {
               <SectionLabel>Who We Are</SectionLabel>
               <h2 className="text-4xl xl:text-5xl font-black uppercase tracking-tight text-white mb-6">
                 One of the top football clubs
-                <span className="text-white"> USA</span>
+                <span className="text-white"> in the USA</span>
               </h2>
             </motion.div>
             <motion.p variants={fadeUp} className="text-white/70 leading-relaxed mb-4">
@@ -735,7 +735,7 @@ export default function Home() {
             </motion.p>
             <motion.p variants={fadeUp} className="text-white/70 leading-relaxed mb-8">
               What started as a small group of passionate youths has now become a deeply rooted and
-              meaningful club â€” now known as Florida Badgers.
+              meaningful club - now known as Florida Badgers.
             </motion.p>
             <motion.div variants={fadeUp} className="flex gap-4">
               <Link href="/academy/about" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#374151] transition-all">
@@ -770,8 +770,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SQUAD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="bg-white py-24 px-6 xl:px-10 snap-start min-h-screen lg:min-h-0">
+      {/* SQUAD */}
+      <section className="bg-white py-24 px-6 xl:px-10 min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -815,8 +815,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ACADEMY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden snap-start min-h-screen lg:min-h-0">
+      {/* ACADEMY */}
+      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
         <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
         <div className="max-w-[1320px] mx-auto">
           <motion.div
@@ -832,8 +832,8 @@ export default function Home() {
                 Badgers Football Academy
               </h2>
               <p className="text-white/60 max-w-2xl mx-auto leading-relaxed">
-                Give your child the chance to shine. At our Football Academy, your children will learn to
-                play football, develop their skills, improve techniques and find new friends.
+                Give your child the chance to shine. At our football academy, children learn to
+                play football, develop their skills, improve technique, and make new friends.
               </p>
             </motion.div>
           </motion.div>
@@ -901,15 +901,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SHOP BANNER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-      <section className="bg-white py-12 md:py-16 px-6 xl:px-10 border-t border-slate-200 snap-start min-h-0">
+      {/* SHOP BANNER */}
+      <section className="bg-white py-12 md:py-16 px-6 xl:px-10 border-t border-slate-200 min-h-0">
         <div className="max-w-[1320px] mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Official Merchandise</div>
             <h2 className="text-3xl font-black uppercase text-black tracking-tight">
               Florida Badgers Official Jersey
             </h2>
-            <p className="text-slate-600 mt-2 text-sm">Performance Edition â€” Black, Grey, White</p>
+            <p className="text-slate-600 mt-2 text-sm">Performance Edition - Black, Grey, White</p>
             <div className="flex items-baseline gap-3 mt-3">
               <span className="text-3xl font-black text-black">$29.99</span>
               <span className="text-slate-400 line-through text-sm">$39.99</span>
@@ -929,8 +929,6 @@ export default function Home() {
     </main>
   );
 }
-
-
 
 
 
