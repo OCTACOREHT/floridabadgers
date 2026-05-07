@@ -133,16 +133,22 @@ function toNewsArticleDetail(row: ActualiteRow): NewsArticleDetail | null {
 }
 
 function toNewsArticle(row: ActualiteRow): NewsArticle | null {
-  const detail = toNewsArticleDetail(row);
-  if (!detail) return null;
+  const title = row.titre?.trim();
+  const subtitleText = row.sous_titre ? stripHtmlToText(row.sous_titre) : "";
+  const description = row.description?.trim();
+  const descriptionText = description ? stripHtmlToText(description) : "";
+
+  if (!title) {
+    return null;
+  }
 
   return {
-    id: detail.id,
-    title: detail.title,
-    excerpt: detail.excerpt,
-    date: detail.date,
-    category: detail.category,
-    image: detail.image,
+    id: row.id,
+    title,
+    excerpt: subtitleText || truncateExcerpt(descriptionText),
+    date: formatNewsDate(row.created_at),
+    category: "Club",
+    image: row.photo_url?.trim() || "/images/IMG_6281.JPG.jpeg",
   };
 }
 
@@ -173,7 +179,7 @@ export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[
 
     if (error) {
       if (isMissingTableError(error)) {
-        return newsArticles.slice(0, safeLimit);
+        return [];
       }
       throw new Error(error.message);
     }
@@ -182,9 +188,9 @@ export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[
       .map(toNewsArticle)
       .filter((article): article is NewsArticle => Boolean(article));
 
-    return articles.length ? articles : newsArticles.slice(0, safeLimit);
+    return articles;
   } catch {
-    return newsArticles.slice(0, Math.max(1, Math.min(limit, 60)));
+    return [];
   }
 }
 
@@ -211,12 +217,8 @@ export async function getPublishedNewsArticleById(id: string): Promise<NewsArtic
     }
 
     const detail = data ? toNewsArticleDetail(data as ActualiteRow) : null;
-    if (detail) {
-      return detail;
-    }
-
-    return getFallbackNewsArticleById(normalizedId);
+    return detail;
   } catch {
-    return getFallbackNewsArticleById(normalizedId);
+    return null;
   }
 }
