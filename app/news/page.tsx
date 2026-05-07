@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Latest news from Florida Badgers FCA: first team, academy, and club updates.",
 };
 
-export const revalidate = 60; // Refresh cached page every 60 seconds
+export const dynamic = "force-dynamic";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
