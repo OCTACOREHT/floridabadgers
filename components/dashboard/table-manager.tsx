@@ -70,7 +70,10 @@ function formatColumnLabel(value: string): string {
 
 function buildInitialForm(config: DashboardTableConfig): Record<string, unknown> {
   return Object.fromEntries(
-    config.createFields.map((field) => [field.key, field.type === "boolean" ? false : ""])
+    config.createFields.map((field) => [
+      field.key,
+      field.defaultValue ?? (field.type === "boolean" ? false : ""),
+    ])
   );
 }
 

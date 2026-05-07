@@ -1,4 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import type { WebSocketLikeConstructor } from "@supabase/realtime-js";
+import WebSocket from "ws";
+
+const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -22,6 +26,8 @@ export function createSupabaseServiceClient() {
       persistSession: false,
       autoRefreshToken: false,
     },
+    realtime: {
+      transport: realtimeTransport,
+    },
   });
 }
-

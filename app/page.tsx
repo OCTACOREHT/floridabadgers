@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, type Variants, AnimatePresence } from "framer-motion";
 import { ArrowRight, Calendar, MapPin, Trophy, Users, Star, ChevronRight } from "lucide-react";
-import { newsArticles } from "@/lib/news";
+import { newsArticles, type NewsArticle } from "@/lib/news";
 import { SiteFooter } from "@/components/SiteFooter";
 import {
   RiAwardLine,
@@ -57,7 +57,7 @@ const whyChoose = [
 
 // ANIMATIONS
 
-const homeNewsCards = newsArticles.slice(0, 3);
+const fallbackHomeNewsCards = newsArticles.slice(0, 3);
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 30 },
@@ -253,6 +253,7 @@ function HeroBackgroundSlider() {
 export default function Home() {
   const [fixtures, setFixtures] = useState<HomeFixture[]>([]);
   const [fixturesError, setFixturesError] = useState<string | null>(null);
+  const [homeNewsCards, setHomeNewsCards] = useState<NewsArticle[]>(fallbackHomeNewsCards);
 
   const upcomingFixtures = fixtures.filter((fixture) => !isFinalFixture(fixture.status));
   const finalFixtures = fixtures.filter((fixture) => isFinalFixture(fixture.status));
@@ -306,14 +307,28 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        window.location.reload();
+    let cancelled = false;
+
+    const loadNews = async () => {
+      try {
+        const response = await fetch("/api/news?limit=3", { cache: "no-store" });
+        const payload = (await response.json()) as { articles?: NewsArticle[] };
+
+        if (!cancelled && Array.isArray(payload.articles) && payload.articles.length) {
+          setHomeNewsCards(payload.articles);
+        }
+      } catch {
+        if (!cancelled) {
+          setHomeNewsCards(fallbackHomeNewsCards);
+        }
       }
     };
 
-    window.addEventListener("pageshow", handlePageShow);
-    return () => window.removeEventListener("pageshow", handlePageShow);
+    void loadNews();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -682,6 +697,7 @@ export default function Home() {
                       src={article.image}
                       alt={article.title}
                       fill
+                      unoptimized={article.image.startsWith("data:")}
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
                   </div>
@@ -924,8 +940,6 @@ export default function Home() {
     </main>
   );
 }
-
-
 
 
 

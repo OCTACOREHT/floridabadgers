@@ -16,7 +16,15 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ClipboardListIcon, ChartSplineIcon, GoalIcon, UsersIcon, Settings2Icon } from "lucide-react"
+import {
+  LayoutDashboardIcon,
+  ClipboardListIcon,
+  ChartSplineIcon,
+  GoalIcon,
+  NewspaperIcon,
+  UsersIcon,
+  Settings2Icon,
+} from "lucide-react"
 
 const data = {
   user: {
@@ -44,6 +52,11 @@ const data = {
       title: "Matches",
       url: "/dashboard/tables/matchs",
       icon: <GoalIcon />,
+    },
+    {
+      title: "Articles",
+      url: "/dashboard/articles",
+      icon: <NewspaperIcon />,
     },
     {
       title: "Players",

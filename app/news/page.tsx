@@ -2,16 +2,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Calendar } from "lucide-react";
-import { newsArticles } from "@/lib/news";
+import { getPublishedNewsArticles } from "@/lib/news.server";
 
 export const metadata: Metadata = {
   title: "News | Florida Badgers FCA",
   description: "Latest news from Florida Badgers FCA: first team, academy, and club updates.",
 };
 
-const featuredNews = newsArticles[0];
-const topNews = newsArticles.slice(1, 3);
-const allNews = newsArticles.slice(0);
+export const dynamic = "force-dynamic";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -21,7 +19,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function NewsPage() {
+export default async function NewsPage() {
+  const allNews = await getPublishedNewsArticles();
+  const featuredNews = allNews[0];
+  const topNews = allNews.slice(1, 3);
+
   return (
     <main className="">
       <section className="bg-slate-900 px-6 xl:px-10 pt-32 pb-20 border-b border-white/10">
@@ -46,7 +48,13 @@ export default function NewsPage() {
                 className="grid sm:grid-cols-[220px_1fr] overflow-hidden bg-white border border-slate-200"
               >
                 <div className="relative h-56 sm:h-full">
-                  <Image src={article.image} alt={article.title} fill className="object-cover" />
+                  <Image
+                    src={article.image}
+                    alt={article.title}
+                    fill
+                    unoptimized={article.image.startsWith("data:")}
+                    className="object-cover"
+                  />
                 </div>
                 <div className="p-6">
                   <p className="text-slate-500 text-sm font-semibold">{article.date}</p>
@@ -62,7 +70,13 @@ export default function NewsPage() {
           {featuredNews && (
             <article id={featuredNews.id} className="overflow-hidden bg-white border border-slate-200">
               <div className="relative aspect-[16/10]">
-                <Image src={featuredNews.image} alt={featuredNews.title} fill className="object-cover" />
+                <Image
+                  src={featuredNews.image}
+                  alt={featuredNews.title}
+                  fill
+                  unoptimized={featuredNews.image.startsWith("data:")}
+                  className="object-cover"
+                />
               </div>
               <div className="p-6">
                 <p className="text-slate-500 text-sm font-semibold">{featuredNews.date}</p>
@@ -115,4 +129,3 @@ export default function NewsPage() {
     </main>
   );
 }
-

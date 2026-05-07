@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import type { WebSocketLikeConstructor } from "@supabase/realtime-js";
+import WebSocket from "ws";
 
 import { rateLimit } from "@/lib/security/rate-limit";
 import { setAuthSessionCookie } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
+const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
 
 type LoginInput = {
   email?: unknown;
@@ -33,6 +36,9 @@ function createSupabaseAuthClient() {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+    },
+    realtime: {
+      transport: realtimeTransport,
     },
   });
 }

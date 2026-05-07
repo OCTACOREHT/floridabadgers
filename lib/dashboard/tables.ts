@@ -17,6 +17,7 @@ export type DashboardTableField = {
   label: string;
   type: FieldKind;
   required?: boolean;
+  defaultValue?: unknown;
   placeholder?: string;
   options?: string[];
 };
@@ -47,14 +48,14 @@ const TABLE_CONFIGS = {
     table: "actualites",
     label: "Articles",
     description: "News and media articles",
-    listColumns: ["titre", "sous_titre", "is_published", "auteur_id", "created_at"],
+    listColumns: ["titre", "sous_titre", "is_published", "created_at"],
     createFields: [
       { key: "titre", label: "Title", type: "text", required: true },
       { key: "sous_titre", label: "Subtitle", type: "text" },
       { key: "photo_url", label: "Photo", type: "text", placeholder: "Ajouter une photo" },
       { key: "description", label: "Description", type: "textarea", required: true },
       { key: "auteur_id", label: "Author ID", type: "uuid" },
-      { key: "is_published", label: "Published", type: "boolean" },
+      { key: "is_published", label: "Published", type: "boolean", defaultValue: true },
     ],
   },
   categories: {

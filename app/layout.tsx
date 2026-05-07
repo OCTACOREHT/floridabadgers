@@ -4,6 +4,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { GlobalFooter } from "@/components/GlobalFooter";
 import { SiteTracker } from "@/components/SiteTracker";
+import { RouteRestoreBoundary } from "@/components/RouteRestoreBoundary";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -30,7 +31,7 @@ export default function RootLayout({
       <body className="bg-slate-100 text-slate-900 antialiased">
         <SiteTracker />
         <Navbar />
-        {children}
+        <RouteRestoreBoundary>{children}</RouteRestoreBoundary>
         <GlobalFooter />
       </body>
     </html>

@@ -1,9 +1,12 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import type { WebSocketLikeConstructor } from "@supabase/realtime-js";
+import WebSocket from "ws";
 import { AUTH_SESSION_COOKIE } from "@/lib/auth/constants";
 
 const DEFAULT_SESSION_TTL_SECONDS = 60 * 60;
+const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
 
 type AuthenticatedUser = {
   id: string;
@@ -36,6 +39,9 @@ function createSupabaseAuthClient() {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+    },
+    realtime: {
+      transport: realtimeTransport,
     },
   });
 
