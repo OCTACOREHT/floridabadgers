@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, type Variants, AnimatePresence } from "framer-motion";
@@ -251,7 +251,6 @@ function HeroBackgroundSlider() {
 // PAGE
 
 export default function Home() {
-  const scrollRootRef = useRef<HTMLElement | null>(null);
   const [fixtures, setFixtures] = useState<HomeFixture[]>([]);
   const [fixturesError, setFixturesError] = useState<string | null>(null);
 
@@ -318,11 +317,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main
-      ref={scrollRootRef}
-      id="home-scroll-root"
-      className="h-screen overflow-y-auto"
-    >
+    <main className="min-h-screen">
 
       {/* HERO */}
       <section className="relative min-h-screen flex items-center overflow-hidden bg-slate-900">
@@ -476,7 +471,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.2 }}
             variants={stagger}
             className="mb-10"
           >
@@ -656,7 +651,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.2 }}
             variants={stagger}
             className="mb-8"
           >
@@ -674,7 +669,7 @@ export default function Home() {
                 key={article.id}
                 initial="hidden"
                 whileInView="show"
-                viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
+                viewport={{ once: true, amount: 0.2 }}
                 variants={fadeUp}
                 className="h-full"
               >
@@ -719,7 +714,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.3, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.3 }}
             variants={stagger}
           >
             <motion.div variants={fadeUp}>
@@ -750,7 +745,7 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, x: 40 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.3, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 0.7 }}
             className="grid grid-cols-2 gap-4"
           >
@@ -776,7 +771,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.2 }}
             variants={stagger}
             className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4"
           >
@@ -794,7 +789,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.1, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.1 }}
             variants={stagger}
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
           >
@@ -822,7 +817,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.2 }}
             variants={stagger}
             className="text-center mb-16"
           >
@@ -842,7 +837,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.1, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.1 }}
             variants={stagger}
             className="flex flex-wrap justify-center gap-3 mb-16"
           >
@@ -862,7 +857,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.1, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.1 }}
             variants={stagger}
             className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12"
           >
@@ -890,7 +885,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.3, root: scrollRootRef }}
+            viewport={{ once: true, amount: 0.3 }}
             variants={fadeUp}
             className="text-center"
           >
@@ -929,7 +924,6 @@ export default function Home() {
     </main>
   );
 }
-
 
 
 

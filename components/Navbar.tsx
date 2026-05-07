@@ -61,24 +61,12 @@ export function Navbar() {
       return;
     }
 
-    const scrollContainer = document.getElementById("home-scroll-root");
-
-    const getScrollPosition = () => {
-      const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-      if (!isDesktop && scrollContainer) {
-        return scrollContainer.scrollTop;
-      }
-      return window.scrollY;
-    };
-
-    const handleScroll = () => setIsScrolled(getScrollPosition() > 20);
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     handleScroll();
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    scrollContainer?.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      scrollContainer?.removeEventListener("scroll", handleScroll);
     };
   }, [pathname, shouldHideNavbar]);
 

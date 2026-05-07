@@ -10,7 +10,7 @@ export function GlobalFooter() {
     return null;
   }
 
-  if (pathname === "/") {
+  if (pathname === "/" || pathname.startsWith("/admin") || pathname.startsWith("/login")) {
     return null;
   }
 
