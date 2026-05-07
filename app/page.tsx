@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, type Variants, AnimatePresence } from "framer-motion";
 import { ArrowRight, Calendar, MapPin, Trophy, Users, Star, ChevronRight } from "lucide-react";
-import { newsArticles, type NewsArticle } from "@/lib/news";
+import { type NewsArticle } from "@/lib/news";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TrackedNewsLink } from "@/components/TrackedNewsLink";
 import {
@@ -58,7 +58,7 @@ const whyChoose = [
 
 // ANIMATIONS
 
-// const fallbackHomeNewsCards = newsArticles.slice(0, 3);
+
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 30 },
@@ -255,6 +255,7 @@ export default function Home() {
   const [fixtures, setFixtures] = useState<HomeFixture[]>([]);
   const [fixturesError, setFixturesError] = useState<string | null>(null);
   const [homeNewsCards, setHomeNewsCards] = useState<NewsArticle[]>([]);
+  const [isNewsLoading, setIsNewsLoading] = useState(true);
 
   const upcomingFixtures = fixtures.filter((fixture) => !isFinalFixture(fixture.status));
   const finalFixtures = fixtures.filter((fixture) => isFinalFixture(fixture.status));
@@ -312,15 +313,17 @@ export default function Home() {
 
     const loadNews = async () => {
       try {
-        const response = await fetch("/api/news?limit=3", { cache: "no-store" });
+        const response = await fetch("/api/news?limit=3");
         const payload = (await response.json()) as { articles?: NewsArticle[] };
 
         if (!cancelled) {
-          setHomeNewsCards(payload.articles ?? []);
+          setHomeNewsCards(Array.isArray(payload.articles) ? payload.articles : []);
+          setIsNewsLoading(false);
         }
       } catch {
         if (!cancelled) {
           setHomeNewsCards([]);
+          setIsNewsLoading(false);
         }
       }
     };
@@ -661,8 +664,8 @@ export default function Home() {
         </div>
       </section>
 
-      {homeNewsCards.length > 0 && (
-        <section className="bg-slate-100 py-16 px-6 xl:px-10 border-t border-slate-200 min-h-screen lg:min-h-0">
+      {/* NEWS */}
+      <section className="bg-slate-100 py-16 px-6 xl:px-10 border-t border-slate-200">
           <div className="max-w-[1320px] mx-auto">
             <motion.div
               initial="hidden"
@@ -679,44 +682,61 @@ export default function Home() {
               </motion.div>
             </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {homeNewsCards.map((article) => (
-                <motion.div
-                  key={article.id}
-                  initial="hidden"
-                  whileInView="show"
-                  viewport={{ once: true, amount: 0.2 }}
-                  variants={fadeUp}
-                  className="h-full"
-                >
-                  <TrackedNewsLink
-                    href={`/news/article/${article.id}`}
-                    articleId={article.id}
-                    className="group block h-full overflow-hidden bg-white border border-slate-200 hover:border-slate-400 transition-all"
+            {isNewsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="bg-white border border-slate-200 animate-pulse">
+                    <div className="aspect-[16/10] bg-slate-200" />
+                    <div className="p-5">
+                      <div className="h-3 w-24 bg-slate-200 rounded mb-3" />
+                      <div className="h-6 w-full bg-slate-200 rounded mb-2" />
+                      <div className="h-6 w-3/4 bg-slate-200 rounded mb-4" />
+                      <div className="h-3 w-full bg-slate-100 rounded mb-2" />
+                      <div className="h-3 w-2/3 bg-slate-100 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : homeNewsCards.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {homeNewsCards.map((article) => (
+                  <motion.div
+                    key={article.id}
+                    initial="hidden"
+                    whileInView="show"
+                    viewport={{ once: true, amount: 0.2 }}
+                    variants={fadeUp}
+                    className="h-full"
                   >
-                    <div className="relative aspect-[16/10]">
-                      <Image
-                        src={article.image}
-                        alt={article.title}
-                        fill
-                        unoptimized={article.image.startsWith("data:")}
-                        className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                      />
-                    </div>
-                    <div className="p-5 h-full flex flex-col">
-                      <p className="text-slate-500 text-xs font-semibold">{article.date}</p>
-                      <h3 className="mt-2 text-2xl sm:text-[30px] leading-[1.08] font-black uppercase tracking-tight text-slate-800">
-                        {article.title}
-                      </h3>
-                      <p className="mt-3 text-sm text-slate-600 leading-relaxed mb-4">{article.excerpt}</p>
-                      <div className="mt-auto pt-4 border-t border-slate-100 flex items-center gap-2 text-[#1e3a5f] font-bold text-xs uppercase tracking-wider group-hover:gap-3 transition-all">
-                        Read Article <ArrowRight size={14} />
+                    <TrackedNewsLink
+                      href={`/news/article/${article.id}`}
+                      articleId={article.id}
+                      className="group block h-full overflow-hidden bg-white border border-slate-200 hover:border-slate-400 transition-all"
+                    >
+                      <div className="relative aspect-[16/10]">
+                        <Image
+                          src={article.image}
+                          alt={article.title}
+                          fill
+                          unoptimized={article.image.startsWith("data:")}
+                          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        />
                       </div>
-                    </div>
-                  </TrackedNewsLink>
-                </motion.div>
-              ))}
-            </div>
+                      <div className="p-5 h-full flex flex-col">
+                        <p className="text-slate-500 text-xs font-semibold">{article.date}</p>
+                        <h3 className="mt-2 text-2xl sm:text-[30px] leading-[1.08] font-black uppercase tracking-tight text-slate-800">
+                          {article.title}
+                        </h3>
+                        <p className="mt-3 text-sm text-slate-600 leading-relaxed mb-4">{article.excerpt}</p>
+                        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center gap-2 text-[#1e3a5f] font-bold text-xs uppercase tracking-wider group-hover:gap-3 transition-all">
+                          Read Article <ArrowRight size={14} />
+                        </div>
+                      </div>
+                    </TrackedNewsLink>
+                  </motion.div>
+                ))}
+              </div>
+            ) : null}
 
             <div className="mt-6">
               <Link
@@ -728,7 +748,6 @@ export default function Home() {
             </div>
           </div>
         </section>
-      )}
       {/* MISSION */}
       <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />

@@ -1,5 +1,5 @@
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { newsArticles, type NewsArticle } from "@/lib/news";
+import { type NewsArticle } from "@/lib/news";
 
 type ActualiteRow = {
   id: string;
@@ -152,18 +152,6 @@ function toNewsArticle(row: ActualiteRow): NewsArticle | null {
   };
 }
 
-function getFallbackNewsArticleById(id: string): NewsArticleDetail | null {
-  const fallback = newsArticles.find((article) => article.id === id);
-  if (!fallback) {
-    return null;
-  }
-
-  return {
-    ...fallback,
-    subtitle: fallback.excerpt,
-    contentHtml: convertPlainTextToHtml(fallback.excerpt),
-  };
-}
 
 export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[]> {
   try {
@@ -188,7 +176,7 @@ export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[
       .map(toNewsArticle)
       .filter((article): article is NewsArticle => Boolean(article));
 
-    return articles;
+    return articles.length ? articles : [];
   } catch {
     return [];
   }
@@ -211,13 +199,12 @@ export async function getPublishedNewsArticleById(id: string): Promise<NewsArtic
 
     if (error) {
       if (isMissingTableError(error)) {
-        return getFallbackNewsArticleById(normalizedId);
+        return null;
       }
       throw new Error(error.message);
     }
 
-    const detail = data ? toNewsArticleDetail(data as ActualiteRow) : null;
-    return detail;
+    return data ? toNewsArticleDetail(data as ActualiteRow) : null;
   } catch {
     return null;
   }
