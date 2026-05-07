@@ -102,7 +102,10 @@ export function Navbar() {
       >
         <div className="max-w-[1280px] mx-auto flex items-center h-16 px-4 xl:px-8 gap-4">
           <div className="relative z-20">
-            <Link href="/" className="relative flex items-center justify-center w-16 h-16 translate-y-1">
+            <Link
+              href="/"
+              className="relative flex items-center justify-center w-16 h-16 translate-y-1"
+            >
               <Image
                 src="/images/Florida Badgers.png"
                 alt="Florida Badgers FCA Logo"

@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, type Variants, AnimatePresence } from "framer-motion";
@@ -19,44 +19,18 @@ import {
   RiYoutubeFill,
 } from "@remixicon/react";
 
-// ─── DATA ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const results = [
-  {
-    home: "Florida Badgers FCA",
-    away: "Opponent",
-    homeScore: 4,
-    awayScore: 0,
-    date: "6 August 2025",
-    competition: "UPSL Florida South Zone II — Fall 2025",
-    homeWin: true,
-  },
-  {
-    home: "City Soccer FC",
-    away: "Florida Badgers FCA",
-    homeScore: 1,
-    awayScore: 5,
-    date: "6 August 2025",
-    competition: "UPSL Florida South Zone II — Fall 2025",
-    homeWin: false,
-  },
-  {
-    home: "Florida Badgers FCA",
-    away: "Florida Soccer Soldiers",
-    homeScore: 4,
-    awayScore: 0,
-    date: "6 August 2025",
-    competition: "UPSL Florida South Zone II — Fall 2025",
-    homeWin: true,
-  },
-];
+const SCHEDULE_SEASON = 2026;
+const UPSL_LOCAL_LOGO = "/images/UPSL.png";
+const TEAM_LOGO_FALLBACK = UPSL_LOCAL_LOGO;
 
 const squad = [
   { number: 32, name: "Luvins Dorsainvil", position: "Goalkeeper" },
   { number: 8, name: "Willdieffson Francois", position: "Right Back" },
   { number: 13, name: "Stephen Jean", position: "Left Back" },
   { number: 6, name: "Jonex Sirius", position: "Midfielder" },
-  { number: 2, name: "Woodmaël Beauchamps", position: "Central Midfielder" },
+  { number: 2, name: "WoodmaÃ«l Beauchamps", position: "Central Midfielder" },
   { number: 10, name: "Carl Edens Joseph", position: "Attacking Mid" },
   { number: 11, name: "Altidort", position: "Attacking Mid" },
   { number: 14, name: "John Nalus", position: "Forward" },
@@ -76,15 +50,15 @@ const whyChooseIcons = [
 ];
 
 const whyChoose = [
-  { icon: "🏋️", title: "Professional Training", desc: "Effective training from our professional coaches" },
-  { icon: "🏅", title: "Authority", desc: "Independent referee invited to every game" },
-  { icon: "⚽", title: "Youth Academy", desc: "Great training program for younger players" },
-  { icon: "⏱️", title: "Precision & Timing", desc: "Players learn to grasp the game faster" },
-  { icon: "🤝", title: "Team Unity", desc: "Being a team player has a deeper sense in sports" },
-  { icon: "🏆", title: "Championship", desc: "All our players take part in championships" },
+  { icon: "ðŸ‹ï¸", title: "Professional Training", desc: "Effective training from our professional coaches" },
+  { icon: "ðŸ…", title: "Authority", desc: "Independent referee invited to every game" },
+  { icon: "âš½", title: "Youth Academy", desc: "Great training program for younger players" },
+  { icon: "â±ï¸", title: "Precision & Timing", desc: "Players learn to grasp the game faster" },
+  { icon: "ðŸ¤", title: "Team Unity", desc: "Being a team player has a deeper sense in sports" },
+  { icon: "ðŸ†", title: "Championship", desc: "All our players take part in championships" },
 ];
 
-// ─── ANIMATIONS ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ ANIMATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const homeNewsCards = newsArticles.slice(0, 3);
 
@@ -94,10 +68,11 @@ const fadeUp: Variants = {
 };
 
 const stagger: Variants = {
+  hidden: {},
   show: { transition: { staggerChildren: 0.1 } },
 };
 
-// ─── COMPONENTS ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -113,12 +88,99 @@ const heroImages = [
   "/images/FB/bah251123001_bad_v_mia-84.jpg",
 ];
 
-// ─── NEXT MATCH CONFIG ── update before each game ───────────────────────────
-const NEXT_MATCH = {
+// â”€â”€â”€ NEXT MATCH CONFIG â”€â”€ update before each game â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const DEFAULT_NEXT_MATCH = {
   opponent: "FC Florida",
   venue: "Broward College North",
   date: "2026-06-07T19:00:00-04:00",
 };
+
+type HomeFixtureSide = {
+  id: number | null;
+  name: string;
+  logoUrl: string | null;
+};
+
+type HomeFixture = {
+  id: number;
+  kickoff: string;
+  competition: string;
+  venue: string | null;
+  status: string | null;
+  home: HomeFixtureSide;
+  away: HomeFixtureSide;
+};
+
+type FixturesApiResponse = {
+  fixtures?: HomeFixture[];
+  error?: string;
+};
+
+function normalizeStatus(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase();
+}
+
+function isFinalFixture(status: string | null | undefined): boolean {
+  const normalized = normalizeStatus(status);
+  return (
+    normalized.includes("final") ||
+    normalized.includes("finished") ||
+    normalized.includes("full time") ||
+    normalized.includes("ft")
+  );
+}
+
+function extractFinalScore(status: string | null | undefined): { homeScore: number | null; awayScore: number | null } {
+  const source = status ?? "";
+  const match = source.match(/(\d+)\s*[-:]\s*(\d+)/);
+  if (!match) {
+    return { homeScore: null, awayScore: null };
+  }
+
+  return {
+    homeScore: Number.parseInt(match[1], 10),
+    awayScore: Number.parseInt(match[2], 10),
+  };
+}
+
+function formatKickoffForCard(kickoff: string): string {
+  const date = new Date(kickoff);
+  if (Number.isNaN(date.getTime())) {
+    return kickoff;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
+const CLUB_NAME_ALIASES: Record<string, string> = {
+  "Florida Badgers FC": "Badgers",
+  "Florida Soccer Soldiers": "Soldiers",
+  "Palm Beach Flames SC": "PB Flames",
+  "Parkland Soccer Club": "Parkland SC",
+  "Inter Miami CF Academy": "Inter Miami",
+  "Elevate Soccer Project ESP Miami": "ESP Miami",
+  "Rush Select Academy": "Rush Select",
+  "Florida Wolves FC": "Wolves FC",
+  "Florida Futbol Club": "Florida Futbol",
+};
+
+function shortClubName(name: string): string {
+  if (CLUB_NAME_ALIASES[name]) {
+    return CLUB_NAME_ALIASES[name];
+  }
+
+  return name
+    .replace(/\bSoccer Club\b/gi, "SC")
+    .replace(/\bFootball Club\b/gi, "FC")
+    .replace(/\bAcademy\b/gi, "Acad.");
+}
 
 type CountdownTime = { days: number; hours: number; minutes: number; seconds: number };
 const EMPTY_COUNTDOWN: CountdownTime = { days: 0, hours: 0, minutes: 0, seconds: 0 };
@@ -189,21 +251,83 @@ function HeroBackgroundSlider() {
   );
 }
 
-// ─── PAGE ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function Home() {
-  const countdown = useCountdown(NEXT_MATCH.date);
-  const opponentWords = NEXT_MATCH.opponent.toUpperCase().split(" ");
+  const scrollRootRef = useRef<HTMLElement | null>(null);
+  const [fixtures, setFixtures] = useState<HomeFixture[]>([]);
+  const [fixturesError, setFixturesError] = useState<string | null>(null);
+
+  const upcomingFixtures = fixtures.filter((fixture) => !isFinalFixture(fixture.status));
+  const finalFixtures = fixtures.filter((fixture) => isFinalFixture(fixture.status));
+  const nextFixture = upcomingFixtures[0] ?? null;
+
+  const nextOpponent =
+    nextFixture
+      ? normalizeStatus(nextFixture.home.name).includes("florida badgers")
+        ? nextFixture.away.name
+        : nextFixture.home.name
+      : DEFAULT_NEXT_MATCH.opponent;
+  const nextVenue = nextFixture?.venue ?? DEFAULT_NEXT_MATCH.venue;
+  const nextKickoff = nextFixture?.kickoff ?? DEFAULT_NEXT_MATCH.date;
+
+  const countdown = useCountdown(nextKickoff);
+  const opponentWords = nextOpponent.toUpperCase().split(" ");
   const opponentTopLine = opponentWords[0] ?? "";
   const opponentBottomLine = opponentWords.slice(1).join(" ");
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFixtures = async () => {
+      try {
+        const response = await fetch(`/api/upsl/fixtures?season=${SCHEDULE_SEASON}`, { cache: "no-store" });
+        const payload = (await response.json()) as FixturesApiResponse;
+
+        if (cancelled) {
+          return;
+        }
+
+        if (Array.isArray(payload.fixtures)) {
+          setFixtures(payload.fixtures);
+        } else {
+          setFixtures([]);
+        }
+        setFixturesError(payload.error ?? null);
+      } catch (error) {
+        if (!cancelled) {
+          setFixtures([]);
+          setFixturesError(error instanceof Error ? error.message : "Unable to load fixtures.");
+        }
+      }
+    };
+
+    void loadFixtures();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
   return (
     <main
+      ref={scrollRootRef}
       id="home-scroll-root"
       className="h-screen overflow-y-auto snap-y snap-mandatory lg:h-auto lg:overflow-visible lg:snap-none"
     >
 
-      {/* ═══════════════════════ HERO ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• HERO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section className="relative min-h-screen snap-start flex items-center overflow-hidden bg-slate-900">
         <HeroBackgroundSlider />
 
@@ -224,7 +348,7 @@ export default function Home() {
         <div className="relative z-20 max-w-[1320px] w-full mx-auto px-5 sm:px-6 xl:px-10 pt-14 sm:pt-24 pb-4 sm:pb-12">
           <div className="flex flex-col lg:flex-row items-start sm:items-center lg:items-end justify-between gap-4 sm:gap-10 min-h-[calc(100svh-7rem)] lg:min-h-0">
 
-            {/* Left — Main copy */}
+            {/* Left â€” Main copy */}
             <motion.div
               initial="hidden"
               animate="show"
@@ -247,7 +371,7 @@ export default function Home() {
                 className="text-white text-lg sm:text-lg max-w-md leading-relaxed font-bold drop-shadow-md"
               >
                 Our mission is to provide a platform for talented and motivated young
-                soccer players to grow, compete, and succeed — both on the field and in
+                soccer players to grow, compete, and succeed â€” both on the field and in
                 life.
               </motion.p>
 
@@ -264,7 +388,7 @@ export default function Home() {
                 {[
                   { value: "2018", label: "Founded" },
                   { value: "6", label: "Academy Groups" },
-                  { value: "UPSL", label: "League", logo: "/images/UPSL.png" },
+                  { value: "UPSL", label: "League", logo: UPSL_LOCAL_LOGO },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center gap-2 sm:gap-3">
                     {s.logo && (
@@ -286,7 +410,7 @@ export default function Home() {
               </motion.div>
             </motion.div>
 
-            {/* Right — Match Ticket */}
+            {/* Right â€” Match Ticket */}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
@@ -336,7 +460,7 @@ export default function Home() {
                       ))}
                     </div>
                     <p className="mt-1.5 text-center md:text-right text-[5px] sm:text-[5px] md:text-[6px] uppercase tracking-[0.16em] text-[#6e7b8f]">
-                      {NEXT_MATCH.venue}
+                      {nextVenue}
                     </p>
                   </div>
                 </div>
@@ -349,60 +473,183 @@ export default function Home() {
 
       </section>
 
-      {/* ═══════════════════════ RECENT RESULTS ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• RESULTS & UPCOMING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section className="bg-white py-20 px-6 xl:px-10 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
             variants={stagger}
-            className="mb-12"
+            className="mb-10"
           >
             <motion.div variants={fadeUp}>
-              <SectionLabel>UPSL 2025</SectionLabel>
-              <h2 className="text-4xl font-black uppercase tracking-tight text-black">Recent Results</h2>
+              <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500 mb-3">
+                <div className="relative w-5 h-5">
+                  <Image src={UPSL_LOCAL_LOGO} alt="UPSL" fill className="object-contain" />
+                </div>
+                UPSL {SCHEDULE_SEASON}
+              </div>
+              <h2 className="text-4xl font-black uppercase tracking-tight text-black">
+                Final Results & Next Matches
+              </h2>
             </motion.div>
           </motion.div>
 
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.1 }}
-            variants={stagger}
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-          >
-            {results.map((r, i) => (
-              <motion.div
-                key={i}
-                variants={fadeUp}
-                className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 bg-white border border-slate-200 px-4 py-4 sm:px-5 sm:py-5 hover:border-slate-400 transition-all"
-              >
-                <div className="min-w-0 text-right">
-                  <span className={`font-bold text-sm md:text-base ${r.homeWin ? "text-black" : "text-slate-700"}`}>
-                    {r.home}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 px-1 flex-shrink-0">
-                  <span className="text-4xl font-black leading-none text-black">{r.homeScore}</span>
-                  <span className="text-slate-300 text-lg">—</span>
-                  <span className="text-4xl font-black leading-none text-black">{r.awayScore}</span>
-                </div>
-                <div className="min-w-0 text-left">
-                  <span className={`font-bold text-sm md:text-base ${!r.homeWin ? "text-black" : "text-slate-700"}`}>
-                    {r.away}
-                  </span>
-                </div>
-                <div className="col-span-3 mt-3 flex flex-wrap items-center justify-center gap-2 text-center">
-                  <span className="text-slate-500 text-xs flex items-center gap-1.5">
-                    <Calendar size={12} /> {r.date}
-                  </span>
-                  <span className="text-slate-300 text-xs">|</span>
-                  <span className="text-slate-400 text-[11px] leading-tight">{r.competition}</span>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
+          {fixturesError ? (
+            <div className="mb-6 border border-amber-300 bg-amber-50 p-4 text-amber-900 text-sm">
+              {fixturesError}
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={stagger}
+            >
+              <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-600 mb-4">Final Results</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {finalFixtures.slice(0, 4).map((fixture) => {
+                  const { homeScore, awayScore } = extractFinalScore(fixture.status);
+                  return (
+                    <motion.div
+                      key={fixture.id}
+                      variants={fadeUp}
+                      className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 bg-white border border-slate-200 px-4 py-4 sm:px-5 sm:py-5 hover:border-slate-400 transition-all"
+                    >
+                      <div className="min-w-0 flex flex-col items-center justify-center gap-1 text-center">
+                        <div className="relative w-9 h-9 md:w-11 md:h-11 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+                          <Image
+                            src={fixture.home.logoUrl || TEAM_LOGO_FALLBACK}
+                            alt={`${fixture.home.name} logo`}
+                            fill
+                            sizes="(min-width: 768px) 44px, 36px"
+                            quality={100}
+                            className="object-contain p-0.5"
+                          />
+                        </div>
+                        <span
+                          className="font-bold text-sm md:text-base leading-tight text-black whitespace-nowrap overflow-hidden text-ellipsis max-w-[110px] md:max-w-[140px]"
+                          title={fixture.home.name}
+                        >
+                          {shortClubName(fixture.home.name)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 px-1 flex-shrink-0">
+                        <span className="text-4xl font-black leading-none text-black">{homeScore ?? "-"}</span>
+                        <span className="text-slate-300 text-lg">-</span>
+                        <span className="text-4xl font-black leading-none text-black">{awayScore ?? "-"}</span>
+                      </div>
+                      <div className="min-w-0 flex flex-col items-center justify-center gap-1 text-center">
+                        <div className="relative w-9 h-9 md:w-11 md:h-11 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+                          <Image
+                            src={fixture.away.logoUrl || TEAM_LOGO_FALLBACK}
+                            alt={`${fixture.away.name} logo`}
+                            fill
+                            sizes="(min-width: 768px) 44px, 36px"
+                            quality={100}
+                            className="object-contain p-0.5"
+                          />
+                        </div>
+                        <span
+                          className="font-bold text-sm md:text-base leading-tight text-black whitespace-nowrap overflow-hidden text-ellipsis max-w-[110px] md:max-w-[140px]"
+                          title={fixture.away.name}
+                        >
+                          {shortClubName(fixture.away.name)}
+                        </span>
+                      </div>
+                      <div className="col-span-3 mt-3 flex flex-wrap items-center justify-center gap-2 text-center">
+                        <span className="text-slate-500 text-xs flex items-center gap-1.5">
+                          <Calendar size={12} /> {formatKickoffForCard(fixture.kickoff)}
+                        </span>
+                        <span className="text-slate-300 text-xs">|</span>
+                        <span className="inline-flex items-center gap-1 text-slate-400 text-[11px] leading-tight">
+                          <Image src={UPSL_LOCAL_LOGO} alt="UPSL" width={12} height={12} className="object-contain" />
+                          {fixture.competition}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+                {!finalFixtures.length ? (
+                  <div className="border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                    No final results yet.
+                  </div>
+                ) : null}
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={stagger}
+            >
+              <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-600 mb-4">Upcoming Matches</h3>
+              <div className="grid grid-cols-1 gap-4">
+                {upcomingFixtures.slice(0, 4).map((fixture) => (
+                  <motion.div
+                    key={fixture.id}
+                    variants={fadeUp}
+                    className="border border-slate-200 bg-white px-5 py-4 hover:border-slate-400 transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <Image src={UPSL_LOCAL_LOGO} alt="UPSL" width={14} height={14} className="object-contain" />
+                        UPSL
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                      <div className="min-w-0 flex items-center gap-2.5">
+                        <div className="relative w-9 h-9 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+                          <Image
+                            src={fixture.home.logoUrl || TEAM_LOGO_FALLBACK}
+                            alt={`${fixture.home.name} logo`}
+                            fill
+                            sizes="36px"
+                            quality={100}
+                            className="object-contain p-0.5"
+                          />
+                        </div>
+                        <p className="font-black text-slate-900 uppercase tracking-wide leading-tight text-sm sm:text-base">
+                          {shortClubName(fixture.home.name)}
+                        </p>
+                      </div>
+                      <p className="text-slate-400 font-black text-xs uppercase tracking-widest text-center">vs</p>
+                      <div className="min-w-0 flex items-center gap-2.5 justify-end">
+                        <p className="font-black text-slate-900 uppercase tracking-wide leading-tight text-sm sm:text-base text-right">
+                          {shortClubName(fixture.away.name)}
+                        </p>
+                        <div className="relative w-9 h-9 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+                          <Image
+                            src={fixture.away.logoUrl || TEAM_LOGO_FALLBACK}
+                            alt={`${fixture.away.name} logo`}
+                            fill
+                            sizes="36px"
+                            quality={100}
+                            className="object-contain p-0.5"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Calendar size={13} /> {formatKickoffForCard(fixture.kickoff)}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin size={13} /> {fixture.venue ?? "TBD"}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+                {!upcomingFixtures.length ? (
+                  <div className="border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                    No upcoming matches right now.
+                  </div>
+                ) : null}
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
@@ -412,7 +659,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
             variants={stagger}
             className="mb-8"
           >
@@ -430,7 +677,7 @@ export default function Home() {
                 key={article.id}
                 initial="hidden"
                 whileInView="show"
-                viewport={{ once: true, amount: 0.2 }}
+                viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
                 variants={fadeUp}
                 className="h-full"
               >
@@ -468,14 +715,14 @@ export default function Home() {
           </div>
         </div>
       </section>
-      {/* ═══════════════════════ MISSION ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MISSION â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden snap-start min-h-screen lg:min-h-0">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
         <div className="max-w-[1320px] mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.3 }}
+            viewport={{ once: true, amount: 0.3, root: scrollRootRef }}
             variants={stagger}
           >
             <motion.div variants={fadeUp}>
@@ -491,7 +738,7 @@ export default function Home() {
             </motion.p>
             <motion.p variants={fadeUp} className="text-white/70 leading-relaxed mb-8">
               What started as a small group of passionate youths has now become a deeply rooted and
-              meaningful club — now known as Florida Badgers.
+              meaningful club â€” now known as Florida Badgers.
             </motion.p>
             <motion.div variants={fadeUp} className="flex gap-4">
               <Link href="/academy/about" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#374151] transition-all">
@@ -506,7 +753,7 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, x: 40 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
+            viewport={{ once: true, amount: 0.3, root: scrollRootRef }}
             transition={{ duration: 0.7 }}
             className="grid grid-cols-2 gap-4"
           >
@@ -526,13 +773,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════════════════════ SQUAD ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SQUAD â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section className="bg-white py-24 px-6 xl:px-10 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
             variants={stagger}
             className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4"
           >
@@ -550,7 +797,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.1 }}
+            viewport={{ once: true, amount: 0.1, root: scrollRootRef }}
             variants={stagger}
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
           >
@@ -571,14 +818,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════════════════════ ACADEMY ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ACADEMY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden snap-start min-h-screen lg:min-h-0">
         <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+            viewport={{ once: true, amount: 0.2, root: scrollRootRef }}
             variants={stagger}
             className="text-center mb-16"
           >
@@ -598,7 +845,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.1 }}
+            viewport={{ once: true, amount: 0.1, root: scrollRootRef }}
             variants={stagger}
             className="flex flex-wrap justify-center gap-3 mb-16"
           >
@@ -618,7 +865,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.1 }}
+            viewport={{ once: true, amount: 0.1, root: scrollRootRef }}
             variants={stagger}
             className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12"
           >
@@ -646,7 +893,7 @@ export default function Home() {
           <motion.div
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, amount: 0.3 }}
+            viewport={{ once: true, amount: 0.3, root: scrollRootRef }}
             variants={fadeUp}
             className="text-center"
           >
@@ -657,7 +904,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════════════════════ SHOP BANNER ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SHOP BANNER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section className="bg-white py-16 px-6 xl:px-10 border-t border-slate-200 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
@@ -665,7 +912,7 @@ export default function Home() {
             <h2 className="text-3xl font-black uppercase text-black tracking-tight">
               Florida Badgers Official Jersey
             </h2>
-            <p className="text-slate-600 mt-2 text-sm">Performance Edition — Black, Grey, White</p>
+            <p className="text-slate-600 mt-2 text-sm">Performance Edition â€” Black, Grey, White</p>
             <div className="flex items-baseline gap-3 mt-3">
               <span className="text-3xl font-black text-black">$29.99</span>
               <span className="text-slate-400 line-through text-sm">$39.99</span>
@@ -681,7 +928,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════════════════════ CONTACT ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• CONTACT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <section className="bg-slate-800 py-20 px-6 xl:px-10 border-t border-white/10 snap-start min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto grid md:grid-cols-3 gap-8">
           <div className="flex items-start gap-4">
@@ -716,7 +963,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ═══════════════════════ FOOTER ═══════════════════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• FOOTER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       <footer className="bg-black py-10 px-6 xl:px-10 border-t border-white/10">
         <div className="max-w-[1320px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
@@ -769,6 +1016,8 @@ export default function Home() {
     </main>
   );
 }
+
+
 
 
 
