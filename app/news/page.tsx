@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Calendar } from "lucide-react";
+import { TrackedNewsLink } from "@/components/TrackedNewsLink";
 import { getPublishedNewsArticles } from "@/lib/news.server";
 
 export const metadata: Metadata = {
@@ -42,10 +43,12 @@ export default async function NewsPage() {
         <div className="max-w-[1320px] mx-auto grid xl:grid-cols-2 gap-6">
           <div className="grid gap-6">
             {topNews.map((article) => (
-              <article
+              <TrackedNewsLink
                 id={article.id}
                 key={article.id}
-                className="grid sm:grid-cols-[220px_1fr] overflow-hidden bg-white border border-slate-200"
+                href={`/news/article/${article.id}`}
+                articleId={article.id}
+                className="group grid sm:grid-cols-[220px_1fr] overflow-hidden bg-white border border-slate-200 transition hover:border-slate-400"
               >
                 <div className="relative h-56 sm:h-full">
                   <Image
@@ -53,7 +56,7 @@ export default async function NewsPage() {
                     alt={article.title}
                     fill
                     unoptimized={article.image.startsWith("data:")}
-                    className="object-cover"
+                    className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                   />
                 </div>
                 <div className="p-6">
@@ -63,19 +66,24 @@ export default async function NewsPage() {
                   </h2>
                   <p className="mt-4 text-slate-600 leading-relaxed">{article.excerpt}</p>
                 </div>
-              </article>
+              </TrackedNewsLink>
             ))}
           </div>
 
           {featuredNews && (
-            <article id={featuredNews.id} className="overflow-hidden bg-white border border-slate-200">
+            <TrackedNewsLink
+              id={featuredNews.id}
+              href={`/news/article/${featuredNews.id}`}
+              articleId={featuredNews.id}
+              className="group overflow-hidden bg-white border border-slate-200 transition hover:border-slate-400"
+            >
               <div className="relative aspect-[16/10]">
                 <Image
                   src={featuredNews.image}
                   alt={featuredNews.title}
                   fill
                   unoptimized={featuredNews.image.startsWith("data:")}
-                  className="object-cover"
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                 />
               </div>
               <div className="p-6">
@@ -85,7 +93,7 @@ export default async function NewsPage() {
                 </h2>
                 <p className="mt-4 text-slate-600 leading-relaxed">{featuredNews.excerpt}</p>
               </div>
-            </article>
+            </TrackedNewsLink>
           )}
         </div>
       </section>
@@ -109,7 +117,12 @@ export default async function NewsPage() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {allNews.map((article) => (
-              <article key={`card-${article.id}`} className="bg-slate-50 border border-slate-200 p-5">
+              <TrackedNewsLink
+                key={`card-${article.id}`}
+                href={`/news/article/${article.id}`}
+                articleId={article.id}
+                className="group bg-slate-50 border border-slate-200 p-5 transition hover:border-slate-400"
+              >
                 <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-wider mb-3">
                   <span className="text-slate-700 font-semibold">{article.category}</span>
                   <span className="text-slate-500 flex items-center gap-1.5">
@@ -121,7 +134,7 @@ export default async function NewsPage() {
                   {article.title}
                 </h3>
                 <p className="mt-3 text-slate-600 leading-relaxed">{article.excerpt}</p>
-              </article>
+              </TrackedNewsLink>
             ))}
           </div>
         </div>

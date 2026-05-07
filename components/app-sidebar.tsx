@@ -45,7 +45,7 @@ const data = {
     },
     {
       title: "Analytics",
-      url: "/dashboard/tables/site_events",
+      url: "/dashboard/analytics",
       icon: <ChartSplineIcon />,
     },
     {

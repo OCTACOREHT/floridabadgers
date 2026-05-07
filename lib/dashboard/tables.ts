@@ -31,6 +31,12 @@ export type DashboardTableConfig = {
   orderBy?: string;
 };
 
+type SiteEventClickRow = {
+  path: string | null;
+  event_value: number | null;
+  metadata: Record<string, unknown> | null;
+};
+
 const TABLE_CONFIGS = {
   users: {
     table: "users",
@@ -50,11 +56,10 @@ const TABLE_CONFIGS = {
     description: "News and media articles",
     listColumns: ["titre", "sous_titre", "is_published", "created_at"],
     createFields: [
+      { key: "photo_url", label: "Photo", type: "text", placeholder: "Ajouter une photo" },
       { key: "titre", label: "Title", type: "text", required: true },
       { key: "sous_titre", label: "Subtitle", type: "text" },
-      { key: "photo_url", label: "Photo", type: "text", placeholder: "Ajouter une photo" },
       { key: "description", label: "Description", type: "textarea", required: true },
-      { key: "auteur_id", label: "Author ID", type: "uuid" },
       { key: "is_published", label: "Published", type: "boolean", defaultValue: true },
     ],
   },
@@ -192,19 +197,6 @@ const TABLE_CONFIGS = {
       { key: "minute_match", label: "Match Minute", type: "number" },
     ],
   },
-  site_events: {
-    table: "site_events",
-    label: "Site Events",
-    description: "Tracked website events",
-    listColumns: ["event_type", "path", "source", "event_value", "created_at"],
-    createFields: [
-      { key: "event_type", label: "Event Type", type: "select", required: true, options: ["page_view", "registration_submitted", "contact_submitted"] },
-      { key: "path", label: "Path", type: "text", required: true },
-      { key: "source", label: "Source", type: "text" },
-      { key: "event_value", label: "Event Value", type: "number" },
-      { key: "metadata", label: "Metadata (JSON)", type: "json", placeholder: "{\"key\":\"value\"}" },
-    ],
-  },
 } satisfies Record<string, DashboardTableConfig>;
 
 export type DashboardTableName = keyof typeof TABLE_CONFIGS;
@@ -229,6 +221,34 @@ function isMissingTableError(error: { code?: string; message?: string } | null):
 
 function isEmptyValue(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === "string" && !value.trim());
+}
+
+function toPositiveCount(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 1;
+}
+
+function extractArticleIdFromPath(path: string | null): string | null {
+  if (!path) return null;
+  const match = path.match(/^\/news\/article\/([^/?#]+)$/i);
+  return match?.[1] ?? null;
+}
+
+function extractArticleIdFromMetadata(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const raw = metadata.articleId ?? metadata.article_id;
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  return trimmed;
 }
 
 function coerceFieldValue(field: DashboardTableField, value: unknown): unknown {
@@ -352,5 +372,51 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
     throw new Error(error.message);
   }
 
-  return (data ?? []) as unknown as Record<string, unknown>[];
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  if (table !== "actualites" || rows.length === 0) {
+    return rows;
+  }
+
+  const articleIds = new Set(
+    rows
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+  );
+
+  if (articleIds.size === 0) {
+    return rows.map((row) => ({ ...row, clicks_count: 0 }));
+  }
+
+  const { data: clickData, error: clickError } = await supabase
+    .from("site_events")
+    .select("path, event_value, metadata")
+    .eq("event_type", "page_view")
+    .like("path", "/news/article/%")
+    .limit(5000);
+
+  if (clickError) {
+    if (isMissingTableError(clickError)) {
+      return rows.map((row) => ({ ...row, clicks_count: 0 }));
+    }
+    throw new Error(clickError.message);
+  }
+
+  const clickMap = new Map<string, number>();
+  for (const eventRow of (clickData ?? []) as SiteEventClickRow[]) {
+    const articleIdFromPath = extractArticleIdFromPath(eventRow.path);
+    const articleIdFromMetadata = extractArticleIdFromMetadata(eventRow.metadata);
+    const articleId = articleIdFromMetadata ?? articleIdFromPath;
+    if (!articleId || !articleIds.has(articleId)) continue;
+
+    const previous = clickMap.get(articleId) ?? 0;
+    clickMap.set(articleId, previous + toPositiveCount(eventRow.event_value));
+  }
+
+  return rows.map((row) => {
+    const rowId = typeof row.id === "string" ? row.id : "";
+    return {
+      ...row,
+      clicks_count: rowId ? clickMap.get(rowId) ?? 0 : 0,
+    };
+  });
 }

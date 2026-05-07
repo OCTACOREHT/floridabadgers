@@ -8,7 +8,7 @@ import { AUTH_SESSION_COOKIE } from "@/lib/auth/constants";
 const DEFAULT_SESSION_TTL_SECONDS = 60 * 60;
 const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
 
-type AuthenticatedUser = {
+export type AuthenticatedUser = {
   id: string;
   email: string | null;
 };

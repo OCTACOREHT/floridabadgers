@@ -10,7 +10,12 @@ export function GlobalFooter() {
     return null;
   }
 
-  if (pathname === "/" || pathname.startsWith("/admin") || pathname.startsWith("/login")) {
+  if (
+    pathname === "/" ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/dashboard")
+  ) {
     return null;
   }
 

@@ -7,6 +7,7 @@ import { motion, type Variants, AnimatePresence } from "framer-motion";
 import { ArrowRight, Calendar, MapPin, Trophy, Users, Star, ChevronRight } from "lucide-react";
 import { newsArticles, type NewsArticle } from "@/lib/news";
 import { SiteFooter } from "@/components/SiteFooter";
+import { TrackedNewsLink } from "@/components/TrackedNewsLink";
 import {
   RiAwardLine,
   RiFootballLine,
@@ -688,8 +689,9 @@ export default function Home() {
                 variants={fadeUp}
                 className="h-full"
               >
-                <Link
-                  href="/news"
+                <TrackedNewsLink
+                  href={`/news/article/${article.id}`}
+                  articleId={article.id}
                   className="group block h-full overflow-hidden bg-white border border-slate-200 hover:border-slate-400 transition-all"
                 >
                   <div className="relative aspect-[16/10]">
@@ -708,7 +710,7 @@ export default function Home() {
                     </h3>
                     <p className="mt-3 text-sm text-slate-600 leading-relaxed">{article.excerpt}</p>
                   </div>
-                </Link>
+                </TrackedNewsLink>
               </motion.div>
             ))}
           </div>
@@ -940,6 +942,4 @@ export default function Home() {
     </main>
   );
 }
-
-
 

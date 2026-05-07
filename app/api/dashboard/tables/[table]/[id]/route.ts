@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getDashboardTableConfig, normalizeTablePayload } from "@/lib/dashboard/tables";
-import { requireApiUser } from "@/lib/auth/api-guard";
+import { requireApiUser, requireApiUserWithUser } from "@/lib/auth/api-guard";
+import { resolveArticleAuthorId } from "@/lib/dashboard/article-author";
 
 export const runtime = "nodejs";
 
@@ -13,8 +14,9 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ table: string; id: string }> }
 ) {
-  const guardResponse = await requireApiUser(request);
-  if (guardResponse) return guardResponse;
+  const auth = await requireApiUserWithUser(request);
+  if (auth.response) return auth.response;
+  const authenticatedUser = auth.user;
 
   const { table, id } = await context.params;
   const config = getDashboardTableConfig(table);
@@ -34,6 +36,25 @@ export async function PATCH(
     }
 
     const supabase = createSupabaseServiceClient();
+    if (table === "actualites" && payload.is_published === true) {
+      const { data: currentArticle, error: currentArticleError } = await supabase
+        .from(config.table)
+        .select("is_published, auteur_id")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (currentArticleError) {
+        return NextResponse.json({ error: currentArticleError.message }, { status: 400 });
+      }
+
+      const shouldAssignAuthor =
+        !currentArticle || currentArticle.is_published !== true || !currentArticle.auteur_id;
+
+      if (shouldAssignAuthor) {
+        payload.auteur_id = await resolveArticleAuthorId(supabase, authenticatedUser.email);
+      }
+    }
+
     const { data, error } = await supabase
       .from(config.table)
       .update(payload)

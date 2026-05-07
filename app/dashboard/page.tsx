@@ -1,7 +1,9 @@
+import { DashboardAnalyticsCharts } from "@/components/dashboard/analytics-charts"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { DataTable } from "@/components/data-table"
 import { SectionCards } from "@/components/section-cards"
 import {
+  getDashboardAnalyticsData,
   getDashboardChartData,
   getDashboardOverviewData,
   getDashboardRegistrationRows,
@@ -10,9 +12,10 @@ import {
 export const dynamic = "force-dynamic"
 
 export default async function Page() {
-  const [overview, chartData, registrations] = await Promise.all([
+  const [overview, chartData, analyticsData, registrations] = await Promise.all([
     getDashboardOverviewData(),
     getDashboardChartData(90),
+    getDashboardAnalyticsData(),
     getDashboardRegistrationRows(120),
   ])
 
@@ -22,6 +25,7 @@ export default async function Page() {
       <div className="px-4 lg:px-6">
         <ChartAreaInteractive data={chartData} />
       </div>
+      <DashboardAnalyticsCharts data={analyticsData} />
       <DataTable data={registrations} />
     </div>
   )
