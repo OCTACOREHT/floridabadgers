@@ -158,9 +158,10 @@ export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[
     const supabase = createSupabaseServiceClient();
     const safeLimit = Math.max(1, Math.min(limit, 60));
 
+    // Only fetch the columns needed for list/card views — skip description (heavy)
     const { data, error } = await supabase
       .from("actualites")
-      .select("id, titre, sous_titre, photo_url, description, is_published, created_at")
+      .select("id, titre, sous_titre, photo_url, created_at")
       .eq("is_published", true)
       .order("created_at", { ascending: false })
       .limit(safeLimit);
@@ -176,7 +177,7 @@ export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[
       .map(toNewsArticle)
       .filter((article): article is NewsArticle => Boolean(article));
 
-    return articles.length ? articles : [];
+    return articles;
   } catch {
     return [];
   }

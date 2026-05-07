@@ -9,7 +9,7 @@ import { ArticleShare } from "@/components/news/article-share";
 import { ArticleViewTracker } from "@/components/news/article-view-tracker";
 import { getPublishedNewsArticleById, getPublishedNewsArticles } from "@/lib/news.server";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60; // Cache article for 60 seconds
 
 type Params = Promise<{ id: string }>;
 
