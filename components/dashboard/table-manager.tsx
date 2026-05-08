@@ -154,6 +154,7 @@ function getPhotoPreviewSource(value: unknown): string | null {
   if (!trimmed) return null;
 
   if (
+    trimmed.startsWith("blob:") ||
     trimmed.startsWith("data:image/") ||
     trimmed.startsWith("http://") ||
     trimmed.startsWith("https://") ||
@@ -248,15 +249,6 @@ function sanitizeArticleEditorHtml(value: string): string {
 
 function isArticleEditorEmpty(value: string): boolean {
   return stripHtmlToText(value).length === 0;
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Unable to read image file."));
-    reader.readAsDataURL(file);
-  });
 }
 
 function loadImageFromFile(file: File): Promise<HTMLImageElement> {
@@ -378,6 +370,14 @@ async function compressImageForUpload(file: File, maxBytes: number): Promise<Fil
   });
 }
 
+function revokePreviewUrls(urlMap: Record<string, string>) {
+  for (const value of Object.values(urlMap)) {
+    if (value.startsWith("blob:")) {
+      URL.revokeObjectURL(value);
+    }
+  }
+}
+
 function toDatetimeLocal(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -428,6 +428,9 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [draggingPhotoField, setDraggingPhotoField] = useState<string | null>(null);
   const [photoFileNames, setPhotoFileNames] = useState<Record<string, string>>({});
+  const [photoFiles, setPhotoFiles] = useState<Record<string, File>>({});
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<Record<string, string>>({});
+  const photoPreviewUrlsRef = useRef<Record<string, string>>({});
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const articleEditorRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -563,41 +566,86 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     }
   }, [articleDescriptionValue, isArticlesTable, panelOpen]);
 
+  useEffect(() => {
+    photoPreviewUrlsRef.current = photoPreviewUrls;
+  }, [photoPreviewUrls]);
+
+  useEffect(() => {
+    return () => {
+      revokePreviewUrls(photoPreviewUrlsRef.current);
+    };
+  }, []);
+
   const resetPanelForm = () => {
+    revokePreviewUrls(photoPreviewUrls);
     setPanelValues(buildInitialForm(config));
     setPanelError(null);
     setPhotoFileNames({});
+    setPhotoFiles({});
+    setPhotoPreviewUrls({});
     setDraggingPhotoField(null);
   };
 
   const openCreatePanel = () => {
+    revokePreviewUrls(photoPreviewUrls);
     setPanelMode("create");
     setActiveRowId(null);
     setPanelValues(buildInitialForm(config));
     setPanelError(null);
     setPhotoFileNames({});
+    setPhotoFiles({});
+    setPhotoPreviewUrls({});
     setDraggingPhotoField(null);
     setPanelOpen(true);
   };
 
   const openViewPanel = (row: Record<string, unknown>) => {
+    revokePreviewUrls(photoPreviewUrls);
     setPanelMode("view");
     setActiveRowId(String(row.id ?? ""));
     setPanelValues(buildFormFromRow(config, row));
     setPanelError(null);
     setPhotoFileNames({});
+    setPhotoFiles({});
+    setPhotoPreviewUrls({});
     setDraggingPhotoField(null);
     setPanelOpen(true);
   };
 
   const openEditPanel = (row: Record<string, unknown>) => {
+    revokePreviewUrls(photoPreviewUrls);
     setPanelMode("edit");
     setActiveRowId(String(row.id ?? ""));
     setPanelValues(buildFormFromRow(config, row));
     setPanelError(null);
     setPhotoFileNames({});
+    setPhotoFiles({});
+    setPhotoPreviewUrls({});
     setDraggingPhotoField(null);
     setPanelOpen(true);
+  };
+
+  const clearPhotoField = (fieldKey: string) => {
+    setPhotoPreviewUrls((prev) => {
+      const current = prev[fieldKey];
+      if (current?.startsWith("blob:")) {
+        URL.revokeObjectURL(current);
+      }
+      const next = { ...prev };
+      delete next[fieldKey];
+      return next;
+    });
+    setPhotoFiles((prev) => {
+      const next = { ...prev };
+      delete next[fieldKey];
+      return next;
+    });
+    setPhotoFileNames((prev) => {
+      const next = { ...prev };
+      delete next[fieldKey];
+      return next;
+    });
+    updateValue(fieldKey, "");
   };
 
   const applyPhotoFile = async (field: DashboardTableField, file: File) => {
@@ -613,13 +661,37 @@ export function DashboardTableManager({ config, initialRows }: Props) {
         return;
       }
 
-      const encoded = await readFileAsDataUrl(processedFile);
-      updateValue(field.key, encoded);
+      const previewUrl = URL.createObjectURL(processedFile);
+      setPhotoPreviewUrls((prev) => {
+        const current = prev[field.key];
+        if (current?.startsWith("blob:")) {
+          URL.revokeObjectURL(current);
+        }
+        return { ...prev, [field.key]: previewUrl };
+      });
+      setPhotoFiles((prev) => ({ ...prev, [field.key]: processedFile }));
       setPhotoFileNames((prev) => ({ ...prev, [field.key]: file.name }));
       setPanelError(null);
     } catch (error) {
       setPanelError(error instanceof Error ? error.message : "Impossible de traiter l'image.");
     }
+  };
+
+  const uploadPhotoField = async (fieldKey: string, file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("table", config.table);
+
+    const response = await fetch("/api/dashboard/upload-image", {
+      method: "POST",
+      body: formData,
+    });
+    const json = (await response.json()) as { imageUrl?: string; error?: string };
+    if (!response.ok || !json.imageUrl) {
+      throw new Error(json.error ?? "Echec de l'upload de l'image.");
+    }
+
+    return json.imageUrl;
   };
 
   const handleRefresh = async () => {
@@ -671,11 +743,20 @@ export function DashboardTableManager({ config, initialRows }: Props) {
         ? `/api/dashboard/tables/${config.table}`
         : `/api/dashboard/tables/${config.table}/${activeRowId}`;
       const method = isCreate ? "POST" : "PATCH";
+      const payload: Record<string, unknown> = { ...panelValues };
+
+      const photoFieldEntries = Object.entries(photoFiles);
+      if (photoFieldEntries.length > 0) {
+        for (const [fieldKey, file] of photoFieldEntries) {
+          const imageUrl = await uploadPhotoField(fieldKey, file);
+          payload[fieldKey] = imageUrl;
+        }
+      }
 
       const response = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(panelValues),
+        body: JSON.stringify(payload),
       });
 
       const json = (await response.json()) as { data?: Record<string, unknown>; error?: string };
@@ -710,6 +791,14 @@ export function DashboardTableManager({ config, initialRows }: Props) {
       ? `Edit ${config.label}`
       : `View ${config.label}`;
   const panelReadonly = panelMode === "view";
+
+  const handlePanelOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setActiveRowId(null);
+      resetPanelForm();
+    }
+    setPanelOpen(nextOpen);
+  };
 
   const renderField = (field: DashboardTableField, options?: RenderFieldOptions) => {
     const id = `${config.table}-${field.key}`;
@@ -908,7 +997,8 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     }
 
     if (isPhotoField(field)) {
-      const previewSource = getPhotoPreviewSource(value);
+      const previewSource =
+        photoPreviewUrls[field.key] ?? getPhotoPreviewSource(value);
       const fileInputId = `${id}-file`;
       const isDragging = draggingPhotoField === field.key;
       const squarePhotoBox = options?.squarePhotoBox === true;
@@ -992,7 +1082,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                   </Button>
                 ) : null}
                 {previewSource ? (
-                  <Button type="button" size="sm" variant="outline" onClick={() => updateValue(field.key, "")}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => clearPhotoField(field.key)}>
                     Retirer
                   </Button>
                 ) : null}
@@ -1225,7 +1315,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
         </CardContent>
       </Card>
 
-      <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
+      <Sheet open={panelOpen} onOpenChange={handlePanelOpenChange}>
         <SheetContent
           side="top"
           className="!inset-auto !top-1/2 !left-1/2 !h-[90vh] !w-[min(1200px,96vw)] !-translate-x-1/2 !-translate-y-1/2 overflow-hidden rounded-2xl border p-0 flex flex-col"
@@ -1340,7 +1430,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                     {isSaving ? "Saving..." : panelMode === "create" ? "Create" : "Save changes"}
                   </Button>
                 ) : null}
-                <Button type="button" variant="outline" onClick={() => setPanelOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => handlePanelOpenChange(false)}>
                   Close
                 </Button>
               </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { cache } from "react";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { notFound } from "next/navigation";
 
@@ -9,9 +10,11 @@ import { ArticleShare } from "@/components/news/article-share";
 import { ArticleViewTracker } from "@/components/news/article-view-tracker";
 import { getPublishedNewsArticleById, getPublishedNewsArticles } from "@/lib/news.server";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 type Params = Promise<{ id: string }>;
+
+const getCachedArticleById = cache(async (id: string) => getPublishedNewsArticleById(id));
 
 export async function generateMetadata({
   params,
@@ -19,7 +22,7 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { id } = await params;
-  const article = await getPublishedNewsArticleById(id);
+  const article = await getCachedArticleById(id);
 
   if (!article) {
     return {
@@ -40,7 +43,7 @@ export default async function NewsArticlePage({
   params: Params;
 }) {
   const { id } = await params;
-  const article = await getPublishedNewsArticleById(id);
+  const article = await getCachedArticleById(id);
 
   if (!article) {
     notFound();

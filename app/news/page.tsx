@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Latest news from Florida Badgers FCA: first team, academy, and club updates.",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (

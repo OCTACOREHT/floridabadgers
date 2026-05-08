@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPublishedNewsArticles } from "@/lib/news.server";
 
 export const runtime = "nodejs";
-export const revalidate = 60;
 
 function parseLimit(value: string | null): number {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -19,7 +18,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ articles }, {
     status: 200,
     headers: {
-      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+      "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300",
     },
   });
 }

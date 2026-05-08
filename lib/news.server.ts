@@ -5,9 +5,9 @@ type ActualiteRow = {
   id: string;
   titre: string | null;
   sous_titre: string | null;
-  photo_url: string | null;
+  photo_url?: string | null;
   description: string | null;
-  is_published: boolean | null;
+  is_published: boolean | string | number | null;
   created_at: string | null;
 };
 
@@ -15,6 +15,9 @@ export type NewsArticleDetail = NewsArticle & {
   subtitle: string | null;
   contentHtml: string;
 };
+
+const NEWS_QUERY_TIMEOUT_MS = 60000;
+const NEWS_FALLBACK_WINDOW = 120;
 
 function isMissingTableError(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
@@ -96,6 +99,24 @@ function normalizeArticleBodyHtml(value: string): string {
   return sanitized || convertPlainTextToHtml(stripHtmlToText(trimmed));
 }
 
+async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = NEWS_QUERY_TIMEOUT_MS): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`News query timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
 function formatNewsDate(value: string | null): string {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) {
@@ -109,6 +130,25 @@ function formatNewsDate(value: string | null): string {
   }).format(date);
 }
 
+function toCreatedAtTimestamp(value: string | null): number {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function isPublishedFlag(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "number") return value === 1;
+  if (typeof value !== "string") return false;
+
+  const normalized = value.trim().toLowerCase();
+  return ["true", "1", "yes", "on", "published"].includes(normalized);
+}
+
+function getNewsImagePath(articleId: string): string {
+  return `/api/news/image/${encodeURIComponent(articleId)}`;
+}
+
 function toNewsArticleDetail(row: ActualiteRow): NewsArticleDetail | null {
   const title = row.titre?.trim();
   const description = row.description?.trim();
@@ -120,13 +160,20 @@ function toNewsArticleDetail(row: ActualiteRow): NewsArticleDetail | null {
     return null;
   }
 
+  const rawImage = row.photo_url?.trim() ?? "";
+  const detailImage = rawImage
+    ? rawImage.startsWith("data:image/")
+      ? getNewsImagePath(row.id)
+      : rawImage
+    : "/images/IMG_6281.JPG.jpeg";
+
   return {
     id: row.id,
     title,
     excerpt: subtitleText || truncateExcerpt(descriptionText),
     date: formatNewsDate(row.created_at),
     category: "Club",
-    image: row.photo_url?.trim() || "/images/IMG_6281.JPG.jpeg",
+    image: detailImage,
     subtitle: subtitleText || null,
     contentHtml: descriptionHtml,
   };
@@ -137,7 +184,6 @@ function toNewsArticle(row: ActualiteRow): NewsArticle | null {
   const subtitleText = row.sous_titre ? stripHtmlToText(row.sous_titre) : "";
   const description = row.description?.trim();
   const descriptionText = description ? stripHtmlToText(description) : "";
-
   if (!title) {
     return null;
   }
@@ -148,37 +194,63 @@ function toNewsArticle(row: ActualiteRow): NewsArticle | null {
     excerpt: subtitleText || truncateExcerpt(descriptionText),
     date: formatNewsDate(row.created_at),
     category: "Club",
-    image: row.photo_url?.trim() || "/images/IMG_6281.JPG.jpeg",
+    image: getNewsImagePath(row.id),
   };
 }
 
-
 export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 60));
+
   try {
     const supabase = createSupabaseServiceClient();
-    const safeLimit = Math.max(1, Math.min(limit, 60));
 
-    // Only fetch the columns needed for list/card views — skip description (heavy)
-    const { data, error } = await supabase
-      .from("actualites")
-      .select("id, titre, sous_titre, photo_url, created_at")
-      .eq("is_published", true)
-      .order("created_at", { ascending: false })
-      .limit(safeLimit);
+    const primary = await withTimeout(
+      supabase
+        .from("actualites")
+        .select("id, titre, sous_titre, created_at, is_published")
+        .eq("is_published", true)
+        .order("created_at", { ascending: false })
+        .limit(safeLimit)
+    );
 
-    if (error) {
-      if (isMissingTableError(error)) {
+    if (primary.error) {
+      if (isMissingTableError(primary.error)) {
         return [];
       }
-      throw new Error(error.message);
+      throw new Error(primary.error.message);
     }
 
-    const articles = ((data ?? []) as ActualiteRow[])
+    const primaryArticles = ((primary.data ?? []) as ActualiteRow[])
       .map(toNewsArticle)
       .filter((article): article is NewsArticle => Boolean(article));
 
-    return articles;
-  } catch {
+    if (primaryArticles.length > 0) {
+      return primaryArticles;
+    }
+
+    const fallbackLimit = Math.max(safeLimit * 4, NEWS_FALLBACK_WINDOW);
+    const fallback = await withTimeout(
+      supabase
+        .from("actualites")
+        .select("id, titre, sous_titre, created_at, is_published")
+        .limit(fallbackLimit)
+    );
+
+    if (fallback.error) {
+      if (isMissingTableError(fallback.error)) {
+        return [];
+      }
+      throw new Error(fallback.error.message);
+    }
+
+    return ((fallback.data ?? []) as ActualiteRow[])
+      .filter((row) => isPublishedFlag(row.is_published))
+      .sort((a, b) => toCreatedAtTimestamp(b.created_at) - toCreatedAtTimestamp(a.created_at))
+      .map(toNewsArticle)
+      .filter((article): article is NewsArticle => Boolean(article))
+      .slice(0, safeLimit);
+  } catch (error) {
+    console.error("[news] Failed to load published articles", error);
     return [];
   }
 }
@@ -191,12 +263,14 @@ export async function getPublishedNewsArticleById(id: string): Promise<NewsArtic
 
   try {
     const supabase = createSupabaseServiceClient();
-    const { data, error } = await supabase
-      .from("actualites")
-      .select("id, titre, sous_titre, photo_url, description, is_published, created_at")
-      .eq("id", normalizedId)
-      .eq("is_published", true)
-      .maybeSingle();
+    const { data, error } = await withTimeout(
+      supabase
+        .from("actualites")
+        .select("id, titre, sous_titre, photo_url, description, is_published, created_at")
+        .eq("id", normalizedId)
+        .eq("is_published", true)
+        .maybeSingle()
+    );
 
     if (error) {
       if (isMissingTableError(error)) {
@@ -206,7 +280,8 @@ export async function getPublishedNewsArticleById(id: string): Promise<NewsArtic
     }
 
     return data ? toNewsArticleDetail(data as ActualiteRow) : null;
-  } catch {
+  } catch (error) {
+    console.error("[news] Failed to load published article by id", error);
     return null;
   }
 }

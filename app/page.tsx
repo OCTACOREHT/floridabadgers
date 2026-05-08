@@ -314,6 +314,9 @@ export default function Home() {
     const loadNews = async () => {
       try {
         const response = await fetch("/api/news?limit=3");
+        if (!response.ok) {
+          throw new Error(`Unable to load news (${response.status})`);
+        }
         const payload = (await response.json()) as { articles?: NewsArticle[] };
 
         if (!cancelled) {
@@ -736,7 +739,11 @@ export default function Home() {
                   </motion.div>
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <div className="border border-slate-200 bg-white p-5 text-sm text-slate-600">
+                No published news found. Please publish at least one article in the dashboard.
+              </div>
+            )}
 
             <div className="mt-6">
               <Link
@@ -965,4 +972,3 @@ export default function Home() {
     </main>
   );
 }
-
