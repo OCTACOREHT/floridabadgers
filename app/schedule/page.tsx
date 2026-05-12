@@ -49,8 +49,8 @@ export default async function SchedulePage() {
             Florida Badgers Match Schedule
           </h1>
           <p className="mt-5 text-white/70 max-w-3xl leading-relaxed">
-            Live fixtures powered by API data for the Florida Badgers {SEASON_YEAR} season.
-            Team logos, kickoff dates, venue and competition are updated automatically.
+            Official match schedule and results for the Florida Badgers {SEASON_YEAR} season.
+            Stay updated with kickoff dates, venues, and team results.
           </p>
         </div>
       </section>
@@ -152,25 +152,7 @@ export default async function SchedulePage() {
         </div>
       </section>
 
-      <section className="bg-slate-900 py-14 px-6 xl:px-10 border-t border-white/10">
-        <div className="max-w-[1320px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-          <div>
-            <SectionLabel>Need Updates?</SectionLabel>
-            <h2 className="text-3xl sm:text-4xl font-black uppercase tracking-tight text-white">
-              Sync New Fixtures Anytime
-            </h2>
-            <p className="text-white/60 mt-2 max-w-2xl">
-              You can refresh the schedule as soon as new UPSL fixtures are published in the API.
-            </p>
-          </div>
-          <Link
-            href="/first-team"
-            className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold uppercase tracking-wider px-7 py-3.5 hover:bg-[#374151] transition-colors"
-          >
-            First Team <ArrowRight size={15} />
-          </Link>
-        </div>
-      </section>
+
     </main>
   );
 }

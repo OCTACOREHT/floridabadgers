@@ -88,9 +88,9 @@ const heroImages = [
 
 // NEXT MATCH CONFIG - update before each game
 const DEFAULT_NEXT_MATCH = {
-  opponent: "FC Florida",
-  venue: "Broward College North",
-  date: "2026-06-07T19:00:00-04:00",
+  opponent: "Plantation FC",
+  venue: "Hester Community Center",
+  date: "2026-05-17T16:00:00-04:00",
 };
 
 type HomeFixtureSide = {

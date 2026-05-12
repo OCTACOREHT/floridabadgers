@@ -278,7 +278,9 @@ const FALLBACK_BADGERS_2026: FallbackFixtureRow[] = [
     date: "05/10/2026",
     timePt: "4:00 pm PT",
     venue: "UPSL Stadium",
-    isResult: false,
+    isResult: true,
+    homeScore: 1,
+    awayScore: 2,
   },
   {
     home: "Florida Badgers FC",
