@@ -4,12 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, CheckCircle2, ChevronLeft, ShieldAlert, UserCheck } from "lucide-react";
 
-type Category = {
-  id: string;
-  nom: string;
-  description: string | null;
-};
 
+
+// Add photo_url to RegistrationForm
 type RegistrationForm = {
   programme_inscription:
     | "junior_foundation"
@@ -22,6 +19,7 @@ type RegistrationForm = {
   adresse: string;
   telephone: string;
   email: string;
+  photo_url?: string; // new field for uploaded photo URL
   poste_jeu: "Gardien" | "Defenseur" | "Milieu" | "Attaquant";
   niveau_jeu: "Debutant" | "Intermediaire" | "Avance";
   stage_periode: "weekend" | "holiday_camp" | "evening_sessions";
@@ -45,12 +43,26 @@ type RegistrationForm = {
   consentement_soins_urgence: boolean;
   accepte_regles_stage: boolean;
   confirme_infos_correctes: boolean;
+  waiver_accepted: boolean;
+  signature_nom: string;
+  signature_date: string;
+  signature_parent_nom: string;
+  signature_parent_date: string;
 };
+
+type Category = {
+  id: string;
+  nom: string;
+  description: string | null;
+};
+
+
 
 const steps = [
   { title: "Player", subtitle: "Personal information" },
   { title: "Football", subtitle: "Sport profile and category" },
   { title: "Health & Emergency", subtitle: "Medical and emergency contact" },
+  { title: "Waiver", subtitle: "Liability release and signature" },
   { title: "Parent Consent", subtitle: "Required for minors" },
   { title: "Review", subtitle: "Confirm and submit" },
 ];
@@ -123,6 +135,11 @@ const initialForm: RegistrationForm = {
   consentement_soins_urgence: false,
   accepte_regles_stage: false,
   confirme_infos_correctes: false,
+  waiver_accepted: false,
+  signature_nom: "",
+  signature_date: new Date().toISOString().split('T')[0],
+  signature_parent_nom: "",
+  signature_parent_date: new Date().toISOString().split('T')[0],
 };
 
 function calculateAge(dateOfBirth: string): number | null {
@@ -182,12 +199,42 @@ function Textarea({
 export default function JoinPage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<RegistrationForm>(initialForm);
+  // Photo upload state
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Handle file selection
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    if (file) {
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    } else {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+    }
+  }
+
+  // Upload helper
+  async function uploadPhoto(file: File): Promise<string> {
+    const form = new FormData();
+    form.append('file', file);
+    const resp = await fetch('/api/upload', { method: 'POST', body: form });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error ?? 'Photo upload failed');
+    }
+    return data.url;
+  }
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categoryError, setCategoryError] = useState<string>("");
   const [formError, setFormError] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+
 
   const age = useMemo(() => calculateAge(form.date_naissance), [form.date_naissance]);
   const isMinor = typeof age === "number" && age < 18;
@@ -233,7 +280,7 @@ export default function JoinPage() {
         if (index === 1 && isStageRegistration) {
           return { ...item, title: "Stage Profile", subtitle: "Program objective and level" };
         }
-        if (index === 3 && !isMinor) {
+        if (index === 4 && !isMinor) {
           return { ...item, title: "Consent", subtitle: "Adult consent and emergency approval" };
         }
         return item;
@@ -309,12 +356,20 @@ export default function JoinPage() {
       if (!form.contact_urgence_telephone.trim()) return "Emergency contact phone is required.";
       if (!form.contact_urgence_relation.trim()) return "Emergency contact relation is required.";
     }
-    if (currentStep === 3 && isMinor) {
+    if (currentStep === 3) {
+      if (!form.waiver_accepted) return "You must read and accept the waiver.";
+      if (isMinor) {
+        if (!form.signature_parent_nom.trim()) return "Parent/Guardian name is required for signature.";
+      } else {
+        if (!form.signature_nom.trim()) return "Participant name is required for signature.";
+      }
+    }
+    if (currentStep === 4 && isMinor) {
       if (!form.nom_parent_tuteur.trim()) return "Parent/tutor name is required for minors.";
       if (!form.telephone_parent_tuteur.trim()) return "Parent/tutor phone is required for minors.";
       if (!form.autorisation_parentale) return "Parental authorization is required for minors.";
     }
-    if (currentStep === 4) {
+    if (currentStep === 5) {
       if (!form.consentement_soins_urgence) return "Emergency care consent is required.";
       if (!form.accepte_regles_stage) {
         return isStageRegistration ? "You must accept stage rules." : "You must accept club rules.";
@@ -340,7 +395,24 @@ export default function JoinPage() {
   }
 
   async function submitForm() {
-    const validationError = validateCurrentStep(4);
+    let uploadedPhotoUrl: string | undefined = undefined;
+
+    // 1. Upload photo if selected
+    if (photoFile) {
+      setUploadingPhoto(true);
+      try {
+        const url = await uploadPhoto(photoFile);
+        uploadedPhotoUrl = url;
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "Photo upload failed");
+        setUploadingPhoto(false);
+        return;
+      }
+      setUploadingPhoto(false);
+    }
+
+    // 2. Validate final step
+    const validationError = validateCurrentStep(5);
     if (validationError) {
       setFormError(validationError);
       return;
@@ -351,6 +423,7 @@ export default function JoinPage() {
     setSuccessMessage("");
 
     try {
+      // 3. Construct payload
       const payload = {
         ...form,
         programme_inscription: form.programme_inscription,
@@ -373,8 +446,15 @@ export default function JoinPage() {
         nom_parent_tuteur: isMinor ? form.nom_parent_tuteur.trim() || null : null,
         telephone_parent_tuteur: isMinor ? form.telephone_parent_tuteur.trim() || null : null,
         autorisation_parentale: isMinor ? form.autorisation_parentale : false,
+        photo_url: uploadedPhotoUrl,
+        waiver_accepted: form.waiver_accepted,
+        signature_nom: form.signature_nom,
+        signature_date: form.signature_date,
+        signature_parent_nom: form.signature_parent_nom,
+        signature_parent_date: form.signature_parent_date,
       };
 
+      // 4. Submit to registrations API
       const response = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -390,6 +470,8 @@ export default function JoinPage() {
         `Registration sent successfully. Reference ID: ${result.registration?.id ?? "pending"}`
       );
       setForm(initialForm);
+      setPhotoFile(null);
+      setPhotoPreview(null);
       setStep(0);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Unexpected error while submitting.");
@@ -555,6 +637,20 @@ export default function JoinPage() {
                       <div className="sm:col-span-2">
                         <FieldLabel>Address</FieldLabel>
                         <Input value={form.adresse} onChange={(e) => update("adresse", e.target.value)} />
+                      </div>
+                      {/* Photo Upload */}
+                      <div className="sm:col-span-2 border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Player Photo</div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoChange}
+                          className="w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#1e3a5f] file:text-white hover:file:bg-[#374151]"
+                        />
+                        {photoPreview && (
+                          <img src={photoPreview} alt="Preview" className="mt-2 max-h-48 rounded-lg object-cover" />
+                        )}
+                        {uploadingPhoto && <p className="mt-1 text-xs text-[#1e3a5f] animate-pulse">Uploading...</p>}
                       </div>
                       <div>
                         <FieldLabel>Phone</FieldLabel>
@@ -736,6 +832,99 @@ export default function JoinPage() {
 
                 {step === 3 && (
                   <div>
+                    <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">Waiver & Release</h2>
+                    <div className="border border-slate-200 bg-white p-4 mb-6 max-h-[400px] overflow-y-auto text-sm text-slate-700 leading-relaxed space-y-4">
+                      <p className="font-bold uppercase underline">AMATEUR ATHLETIC WAIVER AND RELEASE OF LIABILITY</p>
+                      <p className="font-bold underline">READ BEFORE SIGNING</p>
+                      <p>
+                        In consideration of being allowed to participate in any way in <strong>(Sharks FCA Of Florida and city of Boynton beach Florida)</strong> soccer league, related events and activities, the undersigned acknowledges, appreciates, and agrees that:
+                      </p>
+                      <ol className="list-decimal pl-5 space-y-2">
+                        <li>
+                          The risks of injury and illness (ex: communicable diseases such as MRSA, influenza, and COVID-19) from the activities involved in this program are significant, including the potential for permanent paralysis and death, and while particular rules, equipment, and personal discipline may reduce these risks, the risks of serious injury and illness do exist; and,
+                        </li>
+                        <li>
+                          I KNOWINGLY AND FREELY ASSUME ALL SUCH RISKS, both known and unknown, EVEN IF ARISING FROM THE NEGLIGENCE OF THE RELEASEES or others, and assume full responsibility for my participation; and,
+                        </li>
+                        <li>
+                          I willingly agree to comply with the stated and customary terms and conditions for participation. If, however, I observe any unusual significant hazard during my presence or participation, I will remove myself from participation and bring such to the attention of the nearest official immediately; and,
+                        </li>
+                        <li>
+                          I, for myself and on behalf of my heirs, assigns, personal representatives and next of kin, HEREBY RELEASE AND HOLD HARMLESS <strong>(Sharks FCA Of Florida and city of Boynton beach Florida)</strong> their officers, officials, agents, and/or employees, other participants, sponsoring agencies, sponsors, advertisers, and if applicable, owners and lessors of premises used to conduct the event (&quot;RELEASEES&quot;), WITH RESPECT TO ANY AND ALL INJURY, ILLNESS, DISABILITY, DEATH, or loss or damage to person or property, WHETHER ARISING FROM THE NEGLIGENCE OF THE RELEASEES OR OTHERWISE, to the fullest extent permitted by law.
+                        </li>
+                      </ol>
+                      <p className="font-bold uppercase">
+                        I HAVE READ THIS RELEASE OF LIABILITY AND ASSUMPTION OF RISK AGREEMENT, FULLY UNDERSTAND ITS TERMS, UNDERSTAND THAT I HAVE GIVEN UP SUBSTANTIAL RIGHTS BY SIGNING IT, AND SIGN IT FREELY AND VOLUNTARILY WITHOUT ANY INDUCEMENT.
+                      </p>
+
+                      {isMinor && (
+                        <div className="mt-8 pt-6 border-t border-slate-200 space-y-4">
+                          <p className="font-bold uppercase">FOR PARTICIPANTS OF MINORITY AGE (UNDER AGE 18 AT THE TIME OF REGISTRATION)</p>
+                          <p>
+                            This is to certify that I, as parent/guardian with legal responsibility for this participant, have read and explained the provisions in this waiver/release to my child/ward including the risks of the activity and his/her responsibilities for adhering to the rules and regulations. Furthermore, my child/ward understands and accepts these risks and responsibilities. I for myself, my spouse, and child/ward do consent and agree to his/her release provided above for all the Releasees and myself, my spouse, and child/ward do release and agree to indemnify and hold harmless the Releasees from any and all liabilities incident to my minor child&apos;s/ward&apos;s involvement or participation in these activities as provided above, EVEN IF ARISING FROM THEIR NEGLIGENCE, to the fullest extent permitted by law.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="flex items-start gap-3 border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={form.waiver_accepted}
+                          onChange={(e) => update("waiver_accepted", e.target.checked)}
+                          className="h-4 w-4 mt-0.5 accent-[#1e3a5f]"
+                        />
+                        <span>I have read and accept the terms of the Waiver and Release of Liability.</span>
+                      </label>
+
+                      {isMinor ? (
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div>
+                            <FieldLabel>Parent/Guardian Printed Name (Signature)</FieldLabel>
+                            <Input
+                              value={form.signature_parent_nom}
+                              onChange={(e) => update("signature_parent_nom", e.target.value)}
+                              placeholder="Full Name"
+                            />
+                          </div>
+                          <div>
+                            <FieldLabel>Date Signed</FieldLabel>
+                            <Input
+                              type="date"
+                              value={form.signature_parent_date}
+                              readOnly
+                              className="bg-slate-50 cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div>
+                            <FieldLabel>Participant Printed Name (Signature)</FieldLabel>
+                            <Input
+                              value={form.signature_nom}
+                              onChange={(e) => update("signature_nom", e.target.value)}
+                              placeholder="Full Name"
+                            />
+                          </div>
+                          <div>
+                            <FieldLabel>Date Signed</FieldLabel>
+                            <Input
+                              type="date"
+                              value={form.signature_date}
+                              readOnly
+                              className="bg-slate-50 cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {step === 4 && (
+                  <div>
                     <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">
                       {isMinor ? "Parent Consent" : "Consent & Authorization"}
                     </h2>
@@ -786,7 +975,7 @@ export default function JoinPage() {
                   </div>
                 )}
 
-                {step === 4 && (
+                {step === 5 && (
                   <div>
                     <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">Review & Submit</h2>
                     <div className="grid sm:grid-cols-2 gap-4 mb-6">
@@ -827,6 +1016,16 @@ export default function JoinPage() {
                         <div className="text-sm text-slate-600 mt-1">{form.contact_urgence_telephone || "-"}</div>
                         <div className="text-sm text-slate-600">{form.contact_urgence_relation || "-"}</div>
                       </div>
+                      <div className="border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Signature</div>
+                        <div className="font-bold text-slate-900">
+                          {isMinor ? form.signature_parent_nom : form.signature_nom}
+                        </div>
+                        <div className="text-sm text-slate-600 mt-1">
+                          Date: {isMinor ? form.signature_parent_date : form.signature_date}
+                        </div>
+                        <div className="text-xs text-[#1e3a5f] mt-1 font-bold">Waiver Accepted</div>
+                      </div>
                       {isMinor ? (
                         <div className="border border-slate-200 bg-slate-50 p-4">
                           <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Parent</div>
@@ -842,6 +1041,7 @@ export default function JoinPage() {
                         </div>
                       )}
                     </div>
+
 
                     <div className="space-y-3">
                       <label className="flex items-start gap-3 border border-slate-200 bg-white p-3 text-sm text-slate-700">

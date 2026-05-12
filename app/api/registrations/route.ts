@@ -36,6 +36,11 @@ type RegistrationInput = {
   consentement_soins_urgence: boolean;
   accepte_regles_stage: boolean;
   confirme_infos_correctes: boolean;
+  waiver_accepted: boolean;
+  signature_nom?: string | null;
+  signature_date?: string | null;
+  signature_parent_nom?: string | null;
+  signature_parent_date?: string | null;
 };
 
 type LegacyValueSet = {
@@ -226,6 +231,11 @@ export async function POST(request: NextRequest) {
       consentement_soins_urgence: Boolean(body.consentement_soins_urgence),
       accepte_regles_stage: Boolean(body.accepte_regles_stage),
       confirme_infos_correctes: Boolean(body.confirme_infos_correctes),
+      waiver_accepted: Boolean(body.waiver_accepted),
+      signature_nom: normalizeText(body.signature_nom) || null,
+      signature_date: body.signature_date || null,
+      signature_parent_nom: normalizeText(body.signature_parent_nom) || null,
+      signature_parent_date: body.signature_parent_date || null,
     };
 
     const supabase = createSupabaseServiceClient();
@@ -305,6 +315,11 @@ export async function POST(request: NextRequest) {
         autorisation_parentale: Boolean(body.autorisation_parentale),
         accepte_regles_stage: Boolean(body.accepte_regles_stage),
         confirme_infos_correctes: Boolean(body.confirme_infos_correctes),
+        waiver_accepted: Boolean(body.waiver_accepted),
+        signature_nom: normalizeText(body.signature_nom) || null,
+        signature_date: body.signature_date || null,
+        signature_parent_nom: normalizeText(body.signature_parent_nom) || null,
+        signature_parent_date: body.signature_parent_date || null,
       };
 
       const legacyInsert = await supabase
