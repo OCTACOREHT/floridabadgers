@@ -188,13 +188,20 @@ function toNewsArticle(row: ActualiteRow): NewsArticle | null {
     return null;
   }
 
+  const rawImage = row.photo_url?.trim() ?? "";
+  const listImage = rawImage
+    ? rawImage.startsWith("data:image/")
+      ? getNewsImagePath(row.id)
+      : rawImage
+    : "/images/IMG_6281.JPG.jpeg";
+
   return {
     id: row.id,
     title,
     excerpt: subtitleText || truncateExcerpt(descriptionText),
     date: formatNewsDate(row.created_at),
     category: "Club",
-    image: getNewsImagePath(row.id),
+    image: listImage,
   };
 }
 
@@ -207,7 +214,7 @@ export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[
     const primary = await withTimeout(
       supabase
         .from("actualites")
-        .select("id, titre, sous_titre, created_at, is_published")
+        .select("id, titre, sous_titre, photo_url, description, created_at, is_published")
         .eq("is_published", true)
         .order("created_at", { ascending: false })
         .limit(safeLimit)
@@ -232,7 +239,7 @@ export async function getPublishedNewsArticles(limit = 24): Promise<NewsArticle[
     const fallback = await withTimeout(
       supabase
         .from("actualites")
-        .select("id, titre, sous_titre, created_at, is_published")
+        .select("id, titre, sous_titre, photo_url, description, created_at, is_published")
         .limit(fallbackLimit)
     );
 

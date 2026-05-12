@@ -132,7 +132,7 @@ function buildInitialForm(config: DashboardTableConfig): Record<string, unknown>
 }
 
 function isPhotoField(field: DashboardTableField): boolean {
-  return field.type === "text" && /(photo|logo)/i.test(field.key);
+  return field.type === "text" && /(photo|logo|image)/i.test(field.key);
 }
 
 function getFieldSpanClass(field: DashboardTableField): string {
@@ -1202,7 +1202,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                           src={photoSource}
                           alt={title}
                           fill
-                          unoptimized={photoSource.startsWith("data:")}
+                          unoptimized
                           className="object-cover"
                         />
                       </div>

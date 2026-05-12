@@ -53,13 +53,13 @@ export default async function NewsPage() {
                     className="group grid sm:grid-cols-[220px_1fr] overflow-hidden bg-white border border-slate-200 transition hover:border-slate-400"
                   >
                     <div className="relative h-56 sm:h-full">
-                      <Image
-                        src={article.image}
-                        alt={article.title}
-                        fill
-                        unoptimized={article.image.startsWith("data:")}
-                        className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                      />
+                        <Image
+                          src={article.image}
+                          alt={article.title}
+                          fill
+                          unoptimized
+                          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        />
                     </div>
                     <div className="p-6 flex flex-col h-full">
                       <p className="text-slate-500 text-sm font-semibold">{article.date}</p>
@@ -87,7 +87,7 @@ export default async function NewsPage() {
                       src={featuredNews.image}
                       alt={featuredNews.title}
                       fill
-                      unoptimized={featuredNews.image.startsWith("data:")}
+                      unoptimized
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
                   </div>

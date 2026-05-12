@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins, Geist } from "next/font/google";
+import { Poppins, Geist, Montserrat } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { GlobalFooter } from "@/components/GlobalFooter";
@@ -15,6 +15,13 @@ const poppins = Poppins({
   display: "swap",
 });
 
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["700", "800", "900"],
+  variable: "--font-montserrat",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Florida Badgers FCA - Football Club",
   description:
@@ -27,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn(poppins.className, "font-sans", geist.variable)}>
+    <html lang="en" className={cn(poppins.className, "font-sans", geist.variable, montserrat.variable)}>
       <body className="bg-slate-100 text-slate-900 antialiased">
         <SiteTracker />
         <Navbar />

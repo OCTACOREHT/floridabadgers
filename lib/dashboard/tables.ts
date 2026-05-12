@@ -197,6 +197,19 @@ const TABLE_CONFIGS = {
       { key: "minute_match", label: "Match Minute", type: "number" },
     ],
   },
+  hero_slides: {
+    table: "hero_slides",
+    label: "Hero Carousel",
+    description: "Manage homepage hero images and text",
+    listColumns: ["titre", "ordre", "is_active", "created_at"],
+    createFields: [
+      { key: "image_url", label: "Image", type: "text", required: true, placeholder: "Télécharger une photo pour le fond" },
+      { key: "titre", label: "Title", type: "text" },
+      { key: "sous_titre", label: "Subtitle", type: "textarea" },
+      { key: "ordre", label: "Display Order", type: "number", defaultValue: 0 },
+      { key: "is_active", label: "Active", type: "boolean", defaultValue: true },
+    ],
+  },
 } satisfies Record<string, DashboardTableConfig>;
 
 export type DashboardTableName = keyof typeof TABLE_CONFIGS;

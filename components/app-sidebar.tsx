@@ -24,6 +24,7 @@ import {
   NewspaperIcon,
   UsersIcon,
   Settings2Icon,
+  LayoutPanelTopIcon,
 } from "lucide-react"
 
 const data = {
@@ -62,6 +63,11 @@ const data = {
       title: "Players",
       url: "/dashboard/tables/joueurs",
       icon: <UsersIcon />,
+    },
+    {
+      title: "Hero Carousel",
+      url: "/dashboard/tables/hero_slides",
+      icon: <LayoutPanelTopIcon />,
     },
   ],
   navSecondary: [

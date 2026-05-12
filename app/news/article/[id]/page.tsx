@@ -85,7 +85,7 @@ export default async function NewsArticlePage({
               src={article.image}
               alt={article.title}
               fill
-              unoptimized={article.image.startsWith("data:")}
+              unoptimized
               className="object-cover"
             />
           </div>
@@ -143,7 +143,7 @@ async function RelatedArticles({ articleId }: { articleId: string }) {
                 src={entry.image}
                 alt={entry.title}
                 fill
-                unoptimized={entry.image.startsWith("data:")}
+                unoptimized
                 className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               />
             </div>
