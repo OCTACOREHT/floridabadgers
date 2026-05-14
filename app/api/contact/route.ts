@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import fs from "node:fs";
 import path from "node:path";
 import { trackSiteEvent } from "@/lib/analytics/events";
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,7 @@ type ContactInput = {
   email?: string;
   subject?: string;
   message?: string;
+  captchaToken?: string;
 };
 
 function asText(value: unknown): string {
@@ -141,6 +143,11 @@ function renderEmailCard(params: {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ContactInput;
+
+    const captchaResult = await verifyRecaptchaToken(body.captchaToken);
+    if (!captchaResult.success) {
+      return NextResponse.json({ error: captchaResult.error || "CAPTCHA verification failed." }, { status: 403 });
+    }
 
     const name = asText(body.name);
     const email = asText(body.email);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { trackSiteEvent } from "@/lib/analytics/events";
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
 
 type RegistrationInput = {
   programme_inscription:
@@ -10,13 +11,13 @@ type RegistrationInput = {
     | "stage_english";
   nom_complet: string;
   date_naissance: string;
-  sexe: "Masculin" | "Feminin";
+  sexe: "Male" | "Female" | "Masculin" | "Feminin";
   adresse: string;
   telephone: string;
   email: string;
   photo_url?: string | null;
-  poste_jeu: "Gardien" | "Defenseur" | "Milieu" | "Attaquant";
-  niveau_jeu: "Debutant" | "Intermediaire" | "Avance";
+  poste_jeu: "Goalkeeper" | "Defender" | "Midfielder" | "Forward" | "Gardien" | "Defenseur" | "Milieu" | "Attaquant";
+  niveau_jeu: "Beginner" | "Intermediate" | "Advanced" | "Debutant" | "Intermediaire" | "Avance";
   club_actuel?: string | null;
   experience_football?: string | null;
   categorie_id: string;
@@ -41,6 +42,7 @@ type RegistrationInput = {
   signature_date?: string | null;
   signature_parent_nom?: string | null;
   signature_parent_date?: string | null;
+  captchaToken?: string;
 };
 
 type LegacyValueSet = {
@@ -85,38 +87,64 @@ function normalizeText(value: unknown): string {
 
 function shouldFallbackToLegacy(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
-  if (error.code === "42703") return true;
+  if (error.code === "42703" || error.code === "23514") return true;
   const msg = (error.message ?? "").toLowerCase();
-  return msg.includes("does not exist") || msg.includes("categorie_id");
+  return msg.includes("does not exist") || msg.includes("categorie_id") || msg.includes("check constraint");
 }
 
 function mapLegacyWithAccents(input: RegistrationInput): LegacyValueSet {
+  const sexeMap: Record<string, string> = { Male: "Masculin", Female: "F\u00E9minin", Masculin: "Masculin", Feminin: "F\u00E9minin" };
+  const posteMap: Record<string, string> = {
+    Goalkeeper: "Gardien",
+    Defender: "D\u00E9fenseur",
+    Midfielder: "Milieu",
+    Forward: "Attaquant",
+    Gardien: "Gardien",
+    Defenseur: "D\u00E9fenseur",
+    Milieu: "Milieu",
+    Attaquant: "Attaquant",
+  };
+  const niveauMap: Record<string, string> = {
+    Beginner: "D\u00E9butant",
+    Intermediate: "Interm\u00E9diaire",
+    Advanced: "Avanc\u00E9",
+    Debutant: "D\u00E9butant",
+    Intermediaire: "Interm\u00E9diaire",
+    Avance: "Avanc\u00E9",
+  };
+
   return {
-    sexe: input.sexe === "Feminin" ? "F\u00E9minin" : "Masculin",
-    poste_jeu: input.poste_jeu === "Defenseur" ? "D\u00E9fenseur" : input.poste_jeu,
-    niveau_jeu:
-      input.niveau_jeu === "Debutant"
-        ? "D\u00E9butant"
-        : input.niveau_jeu === "Intermediaire"
-        ? "Interm\u00E9diaire"
-        : input.niveau_jeu === "Avance"
-        ? "Avanc\u00E9"
-        : input.niveau_jeu,
+    sexe: sexeMap[input.sexe] || input.sexe,
+    poste_jeu: posteMap[input.poste_jeu] || input.poste_jeu,
+    niveau_jeu: niveauMap[input.niveau_jeu] || input.niveau_jeu,
   };
 }
 
 function mapLegacyMojibake(input: RegistrationInput): LegacyValueSet {
+  const sexeMap: Record<string, string> = { Male: "Masculin", Female: "Féminin", Masculin: "Masculin", Feminin: "Féminin" };
+  const posteMap: Record<string, string> = {
+    Goalkeeper: "Gardien",
+    Defender: "Défenseur",
+    Midfielder: "Milieu",
+    Forward: "Attaquant",
+    Gardien: "Gardien",
+    Defenseur: "Défenseur",
+    Milieu: "Milieu",
+    Attaquant: "Attaquant",
+  };
+  const niveauMap: Record<string, string> = {
+    Beginner: "Débutant",
+    Intermediate: "Intermédiaire",
+    Advanced: "Avancé",
+    Debutant: "Débutant",
+    Intermediaire: "Intermédiaire",
+    Avance: "Avancé",
+  };
+
   return {
-    sexe: input.sexe === "Feminin" ? "Féminin" : "Masculin",
-    poste_jeu: input.poste_jeu === "Defenseur" ? "Défenseur" : input.poste_jeu,
-    niveau_jeu:
-      input.niveau_jeu === "Debutant"
-        ? "Débutant"
-        : input.niveau_jeu === "Intermediaire"
-        ? "Intermédiaire"
-        : input.niveau_jeu === "Avance"
-        ? "Avancé"
-        : input.niveau_jeu,
+    sexe: sexeMap[input.sexe] || input.sexe,
+    poste_jeu: posteMap[input.poste_jeu] || input.poste_jeu,
+    niveau_jeu: niveauMap[input.niveau_jeu] || input.niveau_jeu,
   };
 }
 
@@ -135,6 +163,11 @@ function buildLegacyValueCandidates(input: RegistrationInput): LegacyValueSet[] 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<RegistrationInput>;
+
+    const captchaResult = await verifyRecaptchaToken(body.captchaToken);
+    if (!captchaResult.success) {
+      return NextResponse.json({ error: captchaResult.error || "CAPTCHA verification failed." }, { status: 403 });
+    }
 
     const requiredFields = [
       "programme_inscription",
@@ -183,6 +216,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date of birth." }, { status: 400 });
     }
 
+    const supabase = createSupabaseServiceClient();
+
+    // Fetch category name for backward compatibility with legacy schema
+    const { data: category, error: categoryError } = await supabase
+      .from("categories")
+      .select("nom")
+      .eq("id", body.categorie_id as string)
+      .maybeSingle();
+
+    if (categoryError || !category?.nom) {
+      return NextResponse.json(
+        { error: "Could not find the selected category." },
+        { status: 400 }
+      );
+    }
+
     if (isJuniorRegistration && age >= 18) {
       return NextResponse.json(
         { error: "Junior registration is only for players under 18. Choose Stage (English) for adults." },
@@ -200,21 +249,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate shorter custom Registration ID: FBCA-[INITIALS]-[SHORTID]
+    const nameParts = normalizeText(body.nom_complet).split(/\s+/);
+    const initials = nameParts.map(part => part.substring(0, 2).toUpperCase()).join("");
+    const shortId = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const customRegId = `FBCA-${initials}-${shortId}`;
+
+    const legacyCandidate = mapLegacyWithAccents(body as RegistrationInput);
+
     const payload = {
       programme_inscription: body.programme_inscription,
       nom_complet: normalizeText(body.nom_complet),
       date_naissance: body.date_naissance,
       age,
-      sexe: body.sexe,
+      sexe: legacyCandidate.sexe,
       adresse: normalizeText(body.adresse),
       telephone: normalizeText(body.telephone),
       email: normalizeText(body.email),
       photo_url: normalizeText(body.photo_url) || null,
-      poste_jeu: body.poste_jeu,
-      niveau_jeu: body.niveau_jeu,
+      poste_jeu: legacyCandidate.poste_jeu,
+      niveau_jeu: legacyCandidate.niveau_jeu,
       club_actuel: normalizeText(body.club_actuel) || null,
       experience_football: normalizeText(body.experience_football) || null,
       categorie_id: body.categorie_id,
+      categorie_age: category.nom, // Use the real category name (U7-U17)
+      registration_id: customRegId, // New field
       inscrit_par: isMinor ? body.inscrit_par : "joueur",
       relation_avec_joueur: isMinor ? normalizeText(body.relation_avec_joueur) || null : null,
       probleme_sante: Boolean(body.probleme_sante),
@@ -238,7 +297,6 @@ export async function POST(request: NextRequest) {
       signature_parent_date: body.signature_parent_date || null,
     };
 
-    const supabase = createSupabaseServiceClient();
     const targetTable = isStageRegistration ? "inscriptions_stage" : "inscriptions_joueurs";
 
     const { data, error } = await supabase
@@ -277,18 +335,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const { data: category, error: categoryError } = await supabase
-      .from("categories")
-      .select("nom")
-      .eq("id", body.categorie_id as string)
-      .maybeSingle();
-
-    if (categoryError || !category?.nom) {
-      return NextResponse.json(
-        { error: categoryError?.message ?? "Unable to resolve category for legacy schema fallback." },
-        { status: 500 }
-      );
-    }
 
     const legacyCandidates = buildLegacyValueCandidates(body as RegistrationInput);
 
@@ -307,6 +353,7 @@ export async function POST(request: NextRequest) {
         club_actuel: normalizeText(body.club_actuel) || null,
         experience_football: normalizeText(body.experience_football) || null,
         categorie_age: category.nom,
+        registration_id: customRegId,
         probleme_sante: Boolean(body.probleme_sante),
         probleme_sante_details: normalizeText(body.probleme_sante_details) || null,
         allergies_connues: normalizeText(body.allergies_connues) || null,

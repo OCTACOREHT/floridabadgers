@@ -12,7 +12,12 @@ import {
   RefreshCwIcon,
   SearchIcon,
   Trash2Icon,
+  DownloadIcon,
+  CheckIcon,
+  XIcon,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import type { DashboardTableConfig, DashboardTableField } from "@/lib/dashboard/tables";
 import { Button } from "@/components/ui/button";
@@ -59,7 +64,18 @@ type ArticleRichCommand = "bold" | "italic" | "link" | "bullet-list" | "quote";
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "-";
-  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value === "junior_foundation") return "Junior Program";
+  if (value === "stage_english") return "Stage Program";
+  if (value === "en_attente") return "Pending";
+  if (value === "accepte") return "Accepted";
+  if (value === "refuse") return "Refused";
+
+  // Auto-format ISO dates
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    return formatDashboardDate(value);
+  }
+
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -102,11 +118,32 @@ function formatDashboardDate(value: unknown): string {
     return String(value);
   }
 
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
+    day: "numeric",
     year: "numeric",
   }).format(parsed);
+}
+
+// Helper to compute category from age if missing
+function getCategoryFallback(age: unknown): string {
+  const numAge = Number(age);
+  if (!numAge) return "-";
+  if (numAge <= 7) return "U7";
+  if (numAge <= 9) return "U9";
+  if (numAge <= 11) return "U11";
+  if (numAge <= 13) return "U13";
+  if (numAge <= 15) return "U15";
+  return "U17";
+}
+
+// Helper to compute registration ID from row data if missing
+function getRegistrationIdFallback(row: Record<string, unknown>): string {
+  if (row.registration_id) return String(row.registration_id);
+  const nameParts = String(row.nom_complet || "PLAYER").split(/\s+/);
+  const initials = nameParts.map(part => part.substring(0, 2).toUpperCase()).join("");
+  const id = String(row.id || "").substring(0, 4).toUpperCase();
+  return `FBCA-${initials}-${id}`;
 }
 
 function getPositiveCount(value: unknown): number {
@@ -730,6 +767,242 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     }
   };
 
+  const updateRowStatus = async (id: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/dashboard/tables/${config.table}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statut: newStatus }),
+      });
+      const json = (await response.json()) as { data?: Record<string, unknown>; error?: string };
+      if (!response.ok) throw new Error(json.error ?? "Update failed");
+
+      if (json.data) {
+        setRows((prev) => prev.map((row) => (String(row.id ?? "") === id ? (json.data as Record<string, unknown>) : row)));
+      }
+    } catch (err) {
+      setTableError(err instanceof Error ? err.message : "Update failed");
+    }
+  };
+
+  const generateRegistrationPDF = async (row: Record<string, unknown>) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
+
+    const loadImageBase64 = (url: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = url;
+      });
+    };
+
+    // 1. Professional Side-by-Side Header
+    try {
+      const logoBase64 = await loadImageBase64("/images/Florida Badgers.png");
+      doc.addImage(logoBase64, "PNG", margin, 10, 28, 28);
+    } catch (e) {
+      console.warn("Logo failed to load", e);
+    }
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("FLORIDA BADGERS", 48, 20);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(60, 60, 60);
+    doc.text("1901 N. Seacrest Blvd, Boynton Beach FL 33435", 48, 26);
+    doc.text("Phone: +1 914-426-1526 | +1 305-988-9700", 48, 30);
+    doc.text("Email: info@floridabadgersfca.com | academy@floridabadgersfca.com", 48, 34);
+
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.8);
+    doc.line(margin, 42, pageWidth - margin, 42);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text("OFFICIAL REGISTRATION RECORD", pageWidth / 2, 52, { align: "center" });
+
+    let currentY = 62;
+
+    // 2. Summary Section with Logos and Photo
+    try {
+      const upslBase64 = await loadImageBase64("/images/UPSL.png");
+      doc.addImage(upslBase64, "PNG", margin, currentY, 30, 30);
+    } catch (e) {
+      console.warn("UPSL logo failed to load", e);
+    }
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    
+    const infoX = margin + 35;
+    doc.setFont("helvetica", "bold");
+    doc.text(`REGISTRATION ID: ${getRegistrationIdFallback(row)}`, infoX, currentY + 5);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name: ${formatValue(row.nom_complet)}`, infoX, currentY + 12);
+    doc.text(`Program: ${formatValue(row.programme_inscription)}`, infoX, currentY + 19);
+    doc.text(`Category: ${row.categorie_age || getCategoryFallback(row.age)}`, infoX, currentY + 26);
+    doc.text(`Date Registered: ${formatDashboardDate(row.created_at)}`, infoX, currentY + 33);
+
+    // Player Photo on the far right
+    const photoUrl = row.photo_url as string;
+    if (photoUrl) {
+      try {
+        const playerPhotoBase64 = await loadImageBase64(photoUrl);
+        doc.addImage(playerPhotoBase64, "JPEG", pageWidth - margin - 30, currentY, 30, 38);
+      } catch (e) {
+        console.warn("Player photo failed to load", e);
+      }
+    }
+
+    currentY += 45;
+
+    // 3. Detailed Data Tables
+    const section = (title: string, data: string[][]) => {
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0); // Black
+      doc.text(title, margin, currentY);
+      currentY += 4;
+      autoTable(doc, {
+        startY: currentY,
+        body: data,
+        theme: "grid",
+        headStyles: { fillColor: [0, 0, 0] }, // Black header
+        styles: { fontSize: 8.5, cellPadding: 2, textColor: [0, 0, 0] },
+        columnStyles: { 0: { fontStyle: "bold", width: 50, fillColor: [245, 245, 245] } },
+        margin: { left: margin, right: margin },
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 10;
+    };
+
+    section("PERSONAL DETAILS", [
+      ["Birth Date", formatDashboardDate(row.date_naissance)],
+      ["Age", formatValue(row.age)],
+      ["Sex", formatValue(row.sexe)],
+      ["Address", formatValue(row.adresse)],
+      ["Phone", formatValue(row.telephone)],
+      ["Email", formatValue(row.email)],
+    ]);
+
+    section("FOOTBALL PROFILE", [
+      ["Position", formatValue(row.poste_jeu)],
+      ["Level", formatValue(row.niveau_jeu)],
+      ["Current Club", formatValue(row.club_actuel)],
+      ["Experience", formatValue(row.experience_football)],
+    ]);
+
+    if (currentY > 230) { doc.addPage(); currentY = 20; }
+
+    section("HEALTH & EMERGENCY", [
+      ["Health Issues", formatValue(row.probleme_sante_details)],
+      ["Allergies", formatValue(row.allergies_connues)],
+      ["Emergency Contact", formatValue(row.contact_urgence_nom)],
+      ["Emergency Phone", formatValue(row.contact_urgence_telephone)],
+      ["Relation", formatValue(row.contact_urgence_relation)],
+      ["Emergency Email", formatValue(row.contact_urgence_email)],
+    ]);
+
+    if (row.nom_parent_tuteur) {
+      section("PARENT / GUARDIAN", [
+        ["Parent Name", formatValue(row.nom_parent_tuteur)],
+        ["Parent Phone", formatValue(row.telephone_parent_tuteur)],
+        ["Registered By", formatValue(row.inscrit_par)],
+        ["Relation to Player", formatValue(row.relation_avec_joueur)],
+      ]);
+    }
+
+    // 4. Full Waiver Text
+    if (currentY > 200) { doc.addPage(); currentY = 20; }
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("AMATEUR ATHLETIC WAIVER AND RELEASE OF LIABILITY", margin, currentY);
+    currentY += 6;
+
+    const waiverText = [
+      "In consideration of being allowed to participate in any way in (Sharks FCA Of Florida and city of Boynton beach Florida) soccer league, related events and activities, the undersigned acknowledges, appreciates, and agrees that:",
+      "1. The risks of injury and illness (ex: communicable diseases such as MRSA, influenza, and COVID-19) from the activities involved in this program are significant, including the potential for permanent paralysis and death, and while particular rules, equipment, and personal discipline may reduce these risks, the risks of serious injury and illness do exist; and,",
+      "2. I KNOWINGLY AND FREELY ASSUME ALL SUCH RISKS, both known and unknown, EVEN IF ARISING FROM THE NEGLIGENCE OF THE RELEASEES or others, and assume full responsibility for my participation; and,",
+      "3. I willingly agree to comply with the stated and customary terms and conditions for participation. If, however, I observe any unusual significant hazard during my presence or participation, I will remove myself from participation and bring such to the attention of the nearest official immediately; and,",
+      "4. I, for myself and on behalf of my heirs, assigns, personal representatives and next of kin, HEREBY RELEASE AND HOLD HARMLESS (Sharks FCA Of Florida and city of Boynton beach Florida) their officers, officials, agents, and/or employees, other participants, sponsoring agencies, sponsors, advertisers, and if applicable, owners and lessors of premises used to conduct the event (\"RELEASEES\"), WITH RESPECT TO ANY AND ALL INJURY, ILLNESS, DISABILITY, DEATH, or loss or damage to person or property, WHETHER ARISING FROM THE NEGLIGENCE OF THE RELEASEES OR OTHERWISE, to the fullest extent permitted by law.",
+      "I HAVE READ THIS RELEASE OF LIABILITY AND ASSUMPTION OF RISK AGREEMENT, FULLY UNDERSTAND ITS TERMS, UNDERSTAND THAT I HAVE GIVEN UP SUBSTANTIAL RIGHTS BY SIGNING IT, AND SIGN IT FREELY AND VOLUNTARILY WITHOUT ANY INDUCEMENT.",
+      Number(row.age) < 18 ? "FOR PARTICIPANTS OF MINORITY AGE (UNDER AGE 18): This is to certify that I, as parent/guardian with legal responsibility for this participant, have read and explained the provisions in this waiver/release to my child/ward including the risks of the activity and his/her responsibilities for adhering to the rules and regulations. Furthermore, my child/ward understands and accepts these risks and responsibilities. I for myself, my spouse, and child/ward do consent and agree to his/her release provided above for all the Releasees and myself, my spouse, and child/ward do release and agree to indemnify and hold harmless the Releasees from any and all liabilities incident to my minor child's/ward's involvement or participation in these activities as provided above, EVEN IF ARISING FROM THEIR NEGLIGENCE, to the fullest extent permitted by law." : ""
+    ].join("\n\n");
+
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
+
+    const splitWaiver = doc.splitTextToSize(waiverText, contentWidth);
+    doc.text(splitWaiver, margin, currentY);
+    currentY += splitWaiver.length * 3 + 10;
+
+    // 5. Digital Signatures
+    const sigY = currentY > 250 ? (doc.addPage(), 30) : currentY;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("ATTESTATION & SIGNATURE", margin, sigY);
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.2);
+    doc.rect(margin, sigY + 2, contentWidth, 35);
+
+    const isMinor = Number(row.age) < 18;
+    const sigName = isMinor 
+      ? (row.signature_parent_nom as string || row.nom_parent_tuteur as string || "N/A")
+      : (row.signature_nom as string || row.nom_complet as string || "N/A");
+    
+    const rawDate = isMinor ? row.signature_parent_date : row.signature_date;
+    const sigDate = formatDashboardDate(rawDate || row.created_at);
+
+    // Signature "Scribble" effect using a different font style if possible, or just bold/italic
+    doc.setFont("times", "italic");
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(sigName, margin + 10, sigY + 18);
+    
+    // Label and Date
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text("________________________________________", margin + 10, sigY + 20);
+    doc.text(isMinor ? "Parent / Guardian Signature" : "Participant Signature", margin + 10, sigY + 26);
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.text(sigDate, pageWidth - margin - 10, sigY + 18, { align: "right" });
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text("________________", pageWidth - margin - 10, sigY + 20, { align: "right" });
+    doc.text("Date Signed", pageWidth - margin - 10, sigY + 26, { align: "right" });
+
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text("This document was electronically signed. The signature above is a legally binding electronic representation of the name typed by the user.", pageWidth / 2, sigY + 34, { align: "center" });
+
+    doc.save(`Registration_${row.nom_complet || "Record"}.pdf`);
+  };
+
   const handlePanelSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (panelMode === "view") return;
@@ -1286,11 +1559,48 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                       <TableRow key={id}>
                         {listColumns.map((column) => (
                           <TableCell key={`${id}-${column}`} className="max-w-[220px] truncate">
-                            {formatValue(row[column])}
+                            {column === "registration_id" && !row[column] 
+                              ? getRegistrationIdFallback(row)
+                              : column === "categorie_age" && !row[column]
+                              ? getCategoryFallback(row.age)
+                              : formatValue(row[column])}
                           </TableCell>
                         ))}
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
+                            {config.table === "inscriptions_joueurs" && row.statut === "en_attente" && (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                  onClick={() => updateRowStatus(id, "accepte")}
+                                >
+                                  <CheckIcon className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                  onClick={() => updateRowStatus(id, "refuse")}
+                                >
+                                  <XIcon className="size-4" />
+                                </Button>
+                              </>
+                            )}
+                            {config.table === "inscriptions_joueurs" && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                title="Download PDF"
+                                onClick={() => generateRegistrationPDF(row)}
+                              >
+                                <DownloadIcon className="size-4" />
+                              </Button>
+                            )}
                             <Button type="button" size="sm" variant="ghost" onClick={() => openViewPanel(row)}>
                               <EyeIcon className="mr-1 size-4" />
                               View

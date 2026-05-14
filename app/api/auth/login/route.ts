@@ -5,6 +5,7 @@ import WebSocket from "ws";
 
 import { rateLimit } from "@/lib/security/rate-limit";
 import { setAuthSessionCookie } from "@/lib/auth/session";
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
 
 export const runtime = "nodejs";
 const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
@@ -12,6 +13,7 @@ const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
 type LoginInput = {
   email?: unknown;
   password?: unknown;
+  captchaToken?: string;
 };
 
 function getRequiredEnv(name: string): string {
@@ -78,6 +80,11 @@ export async function POST(request: NextRequest) {
 
   try {
     body = (await request.json()) as LoginInput;
+
+    const captchaResult = await verifyRecaptchaToken(body.captchaToken);
+    if (!captchaResult.success) {
+      return NextResponse.json({ error: captchaResult.error || "CAPTCHA verification failed." }, { status: 403 });
+    }
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }

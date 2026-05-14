@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, CheckCircle2, ChevronLeft, ShieldAlert, UserCheck } from "lucide-react";
+import ReCAPTCHA from "react-google-recaptcha";
 
 
 
@@ -108,12 +109,12 @@ const initialForm: RegistrationForm = {
   programme_inscription: "junior_foundation",
   nom_complet: "",
   date_naissance: "",
-  sexe: "Masculin",
+  sexe: "Male",
   adresse: "",
   telephone: "",
   email: "",
-  poste_jeu: "Milieu",
-  niveau_jeu: "Intermediaire",
+  poste_jeu: "Midfielder",
+  niveau_jeu: "Intermediate",
   stage_periode: "weekend",
   stage_objectif: "technique",
   club_actuel: "",
@@ -234,6 +235,16 @@ export default function JoinPage() {
   const [formError, setFormError] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage("");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
 
   const age = useMemo(() => calculateAge(form.date_naissance), [form.date_naissance]);
@@ -458,7 +469,7 @@ export default function JoinPage() {
       const response = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, captchaToken }),
       });
 
       const result = (await response.json()) as { error?: string; registration?: { id: string } };
@@ -466,9 +477,7 @@ export default function JoinPage() {
         throw new Error(result.error ?? "Unable to submit registration.");
       }
 
-      setSuccessMessage(
-        `Registration sent successfully. Reference ID: ${result.registration?.id ?? "pending"}`
-      );
+      setSuccessMessage("Registration sent successfully!");
       setForm(initialForm);
       setPhotoFile(null);
       setPhotoPreview(null);
@@ -630,8 +639,8 @@ export default function JoinPage() {
                       <div>
                         <FieldLabel>Sex</FieldLabel>
                         <Select value={form.sexe} onChange={(e) => update("sexe", e.target.value as RegistrationForm["sexe"])}>
-                          <option value="Masculin">Masculin</option>
-                          <option value="Feminin">Feminin</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
                         </Select>
                       </div>
                       <div className="sm:col-span-2">
@@ -674,18 +683,18 @@ export default function JoinPage() {
                       <div>
                         <FieldLabel>Position</FieldLabel>
                         <Select value={form.poste_jeu} onChange={(e) => update("poste_jeu", e.target.value as RegistrationForm["poste_jeu"])}>
-                          <option value="Gardien">Gardien</option>
-                          <option value="Defenseur">Defenseur</option>
-                          <option value="Milieu">Milieu</option>
-                          <option value="Attaquant">Attaquant</option>
+                          <option value="Goalkeeper">Goalkeeper</option>
+                          <option value="Defender">Defender</option>
+                          <option value="Midfielder">Midfielder</option>
+                          <option value="Forward">Forward</option>
                         </Select>
                       </div>
                       <div>
                         <FieldLabel>Level</FieldLabel>
                         <Select value={form.niveau_jeu} onChange={(e) => update("niveau_jeu", e.target.value as RegistrationForm["niveau_jeu"])}>
-                          <option value="Debutant">Debutant</option>
-                          <option value="Intermediaire">Intermediaire</option>
-                          <option value="Avance">Avance</option>
+                          <option value="Beginner">Beginner</option>
+                          <option value="Intermediate">Intermediate</option>
+                          <option value="Advanced">Advanced</option>
                         </Select>
                       </div>
                       <div>
@@ -1064,6 +1073,13 @@ export default function JoinPage() {
                         />
                         I confirm all provided information is accurate.
                       </label>
+                    </div>
+
+                    <div className="mt-8 flex justify-start">
+                      <ReCAPTCHA
+                        sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+                        onChange={(token) => setCaptchaToken(token)}
+                      />
                     </div>
                   </div>
                 )}
