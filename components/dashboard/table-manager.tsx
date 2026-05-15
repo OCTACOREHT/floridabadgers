@@ -129,12 +129,16 @@ function formatDashboardDate(value: unknown): string {
 function getCategoryFallback(age: unknown): string {
   const numAge = Number(age);
   if (!numAge) return "-";
+  if (numAge <= 5) return "U5";
   if (numAge <= 7) return "U7";
   if (numAge <= 9) return "U9";
   if (numAge <= 11) return "U11";
   if (numAge <= 13) return "U13";
   if (numAge <= 15) return "U15";
-  return "U17";
+  if (numAge <= 17) return "U17";
+  if (numAge <= 19) return "U19";
+  if (numAge <= 21) return "U21";
+  return "U23";
 }
 
 // Helper to compute registration ID from row data if missing

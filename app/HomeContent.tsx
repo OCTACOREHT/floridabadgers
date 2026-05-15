@@ -22,6 +22,8 @@ import {
 const SCHEDULE_SEASON = 2026;
 const UPSL_LOCAL_LOGO = "/images/UPSL.png";
 const TEAM_LOGO_FALLBACK = UPSL_LOCAL_LOGO;
+const REGISTER_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSc-Uel74bd2lQd12KQbjmCvAxFDvKKWJs9f-htTamLB9B-ZlA/viewform";
 
 const squad = [
   { number: 32, name: "Luvins Dorsainvil", position: "Goalkeeper" },
@@ -36,7 +38,7 @@ const squad = [
   { number: 2, name: "Bens Deliska", position: "Forward" },
 ];
 
-const academyCategories = ["U7", "U9", "U11", "U13", "U15", "U17"];
+const academyCategories = ["U5", "U7", "U9", "U11", "U13", "U15", "U17", "U19", "U21", "U23"];
 
 const whyChooseIcons = [
   RiUserStarLine,
@@ -54,6 +56,22 @@ const whyChoose = [
   { title: "Precision & Timing", desc: "Players learn how to read the game faster." },
   { title: "Team Unity", desc: "We build discipline, trust, and teamwork on and off the pitch." },
   { title: "Championship Mindset", desc: "Every player is prepared to compete at a high level." },
+];
+
+const u23Pathway = [
+  "Florida Badgers Academy",
+  "U18 Team",
+  "U23 Team",
+  "Reserve Team",
+  "First Team",
+];
+
+const u23Highlights = [
+  { label: "Launch Date", value: "May 10, 2026" },
+  { label: "Competition", value: "Not Announced Yet" },
+  { label: "Status", value: "No Official Fixtures Yet" },
+  { label: "Tryouts Start", value: "May 23, 2026" },
+  { label: "Tryout Time", value: "7:00 AM" },
 ];
 
 // ANIMATIONS
@@ -873,6 +891,76 @@ export default function HomeContent({
         </div>
       </section>
 
+      {/* U23 ANNOUNCEMENT */}
+      <section className="relative overflow-hidden bg-slate-900 py-24 px-6 xl:px-10 border-y border-white/10">
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -top-20 -left-20 h-72 w-72 rounded-full bg-[#1e3a5f]/40 blur-3xl"
+          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"
+          animate={{ scale: [1.1, 1, 1.1], opacity: [0.25, 0.5, 0.25] }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        <div className="relative max-w-[1320px] mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, amount: 0.2 }}
+            variants={stagger}
+            className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 items-start"
+          >
+            <motion.div variants={fadeUp}>
+              <SectionLabel>Senior Development</SectionLabel>
+              <h2 className="text-4xl sm:text-5xl font-black uppercase tracking-tight text-white leading-[1.04]">
+                Florida Badgers Launches U23 Team
+              </h2>
+              <p className="mt-5 text-white/70 leading-relaxed max-w-2xl">
+                The U23 project is now official, creating a direct bridge from academy football to senior competition.
+                This structure supports player growth, match exposure, and promotion opportunities into the Reserve and First Team.
+              </p>
+
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Link
+                  href="/first-team/u23"
+                  className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#374151] transition-all"
+                >
+                  Read Full Announcement <ArrowRight size={15} />
+                </Link>
+                <Link
+                  href={REGISTER_FORM_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 border border-white/25 text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:border-white transition-all"
+                >
+                  Register For Senior Team
+                </Link>
+              </div>
+            </motion.div>
+
+            <motion.div variants={fadeUp} className="grid sm:grid-cols-2 gap-3">
+              {u23Highlights.map((item) => (
+                <article key={item.label} className="bg-white/5 border border-white/15 p-4 backdrop-blur-[1px]">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/60">{item.label}</p>
+                  <p className="mt-2 text-lg font-black uppercase tracking-tight text-white">{item.value}</p>
+                </article>
+              ))}
+
+              <article className="sm:col-span-2 bg-white border border-slate-200 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Player Pathway</p>
+                <p className="mt-2 text-sm sm:text-base font-black uppercase tracking-tight text-slate-900 leading-relaxed">
+                  {u23Pathway.join(" -> ")}
+                </p>
+              </article>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ACADEMY */}
       <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
         <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
@@ -959,26 +1047,23 @@ export default function HomeContent({
         </div>
       </section>
 
-      {/* SHOP BANNER */}
+      {/* JOIN CTA */}
       <section className="bg-white py-12 md:py-16 px-6 xl:px-10 border-t border-slate-200 min-h-0">
         <div className="max-w-[1320px] mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Official Merchandise</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Join The Academy</div>
             <h2 className="text-3xl font-black uppercase text-black tracking-tight">
-              Florida Badgers Official Jersey
+              Join Florida Badgers Today
             </h2>
-            <p className="text-slate-600 mt-2 text-sm">Performance Edition - Black, Grey, White</p>
-            <div className="flex items-baseline gap-3 mt-3">
-              <span className="text-3xl font-black text-black">$29.99</span>
-              <span className="text-slate-400 line-through text-sm">$39.99</span>
-              <span className="bg-black text-white text-xs font-bold px-2 py-0.5 rounded-sm">-25%</span>
-            </div>
+            <p className="text-slate-600 mt-2 text-sm">
+              Take the next step in your football journey. Register now and become part of the Florida Badgers family.
+            </p>
           </div>
           <Link
-            href="/shop"
+            href="/join"
             className="flex-shrink-0 inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold uppercase tracking-wider px-8 py-4 hover:bg-[#374151] transition-all"
           >
-            View All Products <ArrowRight size={16} />
+            Register Now <ArrowRight size={16} />
           </Link>
         </div>
       </section>

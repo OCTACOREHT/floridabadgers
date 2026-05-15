@@ -272,7 +272,7 @@ export async function POST(request: NextRequest) {
       club_actuel: normalizeText(body.club_actuel) || null,
       experience_football: normalizeText(body.experience_football) || null,
       categorie_id: body.categorie_id,
-      categorie_age: category.nom, // Use the real category name (U7-U17)
+      categorie_age: category.nom, // Use the real category name (U5-U23)
       registration_id: customRegId, // New field
       inscrit_par: isMinor ? body.inscrit_par : "joueur",
       relation_avec_joueur: isMinor ? normalizeText(body.relation_avec_joueur) || null : null,
