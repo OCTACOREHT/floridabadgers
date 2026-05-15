@@ -5,6 +5,7 @@ import {
   RiFacebookFill,
   RiTwitterXFill,
   RiInstagramLine,
+  RiTiktokFill,
   RiYoutubeFill,
 } from "@remixicon/react";
 
@@ -20,7 +21,8 @@ const FOOTER_LINKS = [
 const SOCIAL_LINKS = [
   { icon: <RiFacebookFill size={16} />, href: "https://www.facebook.com/share/1BBXhVuuEU/", label: "Facebook" },
   { icon: <RiTwitterXFill size={16} />, href: "https://x.com/flbadgersfc", label: "X" },
-  { icon: <RiInstagramLine size={16} />, href: "https://www.instagram.com/floridabadgersfc", label: "Instagram" },
+  { icon: <RiInstagramLine size={16} />, href: "https://www.instagram.com/florida_badgersfc?igsh=MXVreGJ3andwaTVtag==&utm_source=ig_contact_invite", label: "Instagram" },
+  { icon: <RiTiktokFill size={16} />, href: "https://www.tiktok.com/@fb_231224?_r=1&_t=ZP-96ONWMQ5FqJ", label: "TikTok" },
   { icon: <RiYoutubeFill size={16} />, href: "https://www.youtube.com/@FloridaBadgersfc", label: "YouTube" },
 ];
 
