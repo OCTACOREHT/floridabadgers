@@ -246,6 +246,8 @@ type HeroBackgroundSliderProps = {
 
 function HeroBackgroundSlider({ slides, currentIndex }: HeroBackgroundSliderProps) {
   if (!slides.length) return null;
+  const nextIndex = slides.length > 1 ? (currentIndex + 1) % slides.length : currentIndex;
+  const nextSlide = slides[nextIndex];
 
   return (
     <div className="absolute inset-0 z-0">
@@ -262,12 +264,28 @@ function HeroBackgroundSlider({ slides, currentIndex }: HeroBackgroundSliderProp
             src={slides[currentIndex].image_url}
             alt="Florida Badgers FCA action"
             fill
-            unoptimized
+            sizes="100vw"
+            quality={95}
+            loading="eager"
             className="object-cover object-center"
             priority={currentIndex === 0}
           />
         </motion.div>
       </AnimatePresence>
+      {slides.length > 1 ? (
+        <div className="absolute inset-0 opacity-0 pointer-events-none">
+          <Image
+            src={nextSlide.image_url}
+            alt=""
+            fill
+            sizes="100vw"
+            quality={95}
+            loading="eager"
+            className="object-cover object-center"
+            aria-hidden
+          />
+        </div>
+      ) : null}
       <div className="absolute inset-0 bg-black/5 z-10" />
       <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 via-slate-900/20 to-transparent z-10" />
     </div>

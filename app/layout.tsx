@@ -22,6 +22,17 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
+const supabaseImageOrigin = (() => {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!rawUrl) return null;
+
+  try {
+    return new URL(rawUrl).origin;
+  } catch {
+    return null;
+  }
+})();
+
 export const metadata: Metadata = {
   title: "Florida Badgers FCA - Football Club",
   description:
@@ -43,6 +54,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn(poppins.className, "font-sans", geist.variable, montserrat.variable)}>
+      <head>
+        {supabaseImageOrigin ? (
+          <>
+            <link rel="preconnect" href={supabaseImageOrigin} crossOrigin="" />
+            <link rel="dns-prefetch" href={supabaseImageOrigin} />
+          </>
+        ) : null}
+      </head>
       <body className="bg-slate-100 text-slate-900 antialiased overflow-x-hidden">
         <SiteTracker />
         <Navbar />
