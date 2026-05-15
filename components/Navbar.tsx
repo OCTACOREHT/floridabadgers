@@ -82,7 +82,7 @@ export function Navbar() {
   return (
     <div className={montserrat.className}>
       <header
-        className={`hidden lg:block fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`hidden xl:block fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled 
             ? "bg-[#FFFFFF] shadow-md h-16" 
             : "bg-transparent h-20"
@@ -165,7 +165,7 @@ export function Navbar() {
       </header>
 
       <header
-        className={`lg:hidden fixed top-0 left-0 right-0 z-50 h-14 transition-all duration-300 ${
+        className={`xl:hidden fixed top-0 left-0 right-0 z-50 h-14 transition-all duration-300 ${
           isScrolled ? "bg-[#FFFFFF] border-b border-slate-200 shadow-sm" : "bg-transparent border-b border-transparent"
         }`}
       >

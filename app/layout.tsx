@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn(poppins.className, "font-sans", geist.variable, montserrat.variable)}>
-      <body className="bg-slate-100 text-slate-900 antialiased">
+      <body className="bg-slate-100 text-slate-900 antialiased overflow-x-hidden">
         <SiteTracker />
         <Navbar />
         <RouteRestoreBoundary>{children}</RouteRestoreBoundary>

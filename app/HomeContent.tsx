@@ -363,7 +363,7 @@ export default function HomeContent({
   const opponentBottomLine = opponentWords.slice(1).join(" ");
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen overflow-x-hidden">
 
       {/* HERO */}
       <section className="relative h-[100svh] min-h-[600px] w-full overflow-hidden bg-slate-900 flex flex-col justify-center">

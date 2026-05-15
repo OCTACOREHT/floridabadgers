@@ -52,10 +52,10 @@ export function SiteFooter() {
             <div className="w-10 h-10 bg-[#2E2E2E] flex items-center justify-center flex-shrink-0">
               <Mail size={18} className="text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="font-bold text-sm uppercase tracking-wider text-black mb-1">Email</div>
-              <div className="text-[#2E2E2E] text-sm">info@floridabadgersfca.com</div>
-              <div className="text-[#2E2E2E] text-sm">academy@floridabadgersfca.com</div>
+              <div className="text-[#2E2E2E] text-sm break-all">info@floridabadgersfca.com</div>
+              <div className="text-[#2E2E2E] text-sm break-all">academy@floridabadgersfca.com</div>
             </div>
           </div>
         </div>
