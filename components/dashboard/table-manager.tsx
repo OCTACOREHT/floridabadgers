@@ -61,6 +61,7 @@ type RenderFieldOptions = {
   squarePhotoBox?: boolean;
 };
 type ArticleRichCommand = "bold" | "italic" | "link" | "bullet-list" | "quote";
+type PdfWithAutoTable = jsPDF & { lastAutoTable?: { finalY: number } };
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "-";
@@ -791,6 +792,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
 
   const generateRegistrationPDF = async (row: Record<string, unknown>) => {
     const doc = new jsPDF();
+    const tableDoc = doc as PdfWithAutoTable;
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
     const contentWidth = pageWidth - margin * 2;
@@ -891,10 +893,10 @@ export function DashboardTableManager({ config, initialRows }: Props) {
         theme: "grid",
         headStyles: { fillColor: [0, 0, 0] }, // Black header
         styles: { fontSize: 8.5, cellPadding: 2, textColor: [0, 0, 0] },
-        columnStyles: { 0: { fontStyle: "bold", width: 50, fillColor: [245, 245, 245] } },
+        columnStyles: { 0: { fontStyle: "bold", cellWidth: 50, fillColor: [245, 245, 245] } },
         margin: { left: margin, right: margin },
       });
-      currentY = (doc as any).lastAutoTable.finalY + 10;
+      currentY = (tableDoc.lastAutoTable?.finalY ?? currentY) + 10;
     };
 
     section("PERSONAL DETAILS", [

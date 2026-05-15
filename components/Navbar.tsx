@@ -84,7 +84,7 @@ export function Navbar() {
       <header
         className={`hidden lg:block fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled 
-            ? "bg-white shadow-md h-16" 
+            ? "bg-[#FFFFFF] shadow-md h-16" 
             : "bg-transparent h-20"
         }`}
       >
@@ -142,8 +142,8 @@ export function Navbar() {
                     item.variant === "primary"
                       ? `inline-flex items-center px-5 py-2.5 text-[12px] xl:text-[13px] font-bold uppercase tracking-wider transition-all ${
                           isScrolled 
-                            ? "bg-[#1e3a5f] text-white hover:bg-[#374151]" 
-                            : "bg-white text-[#1e3a5f] hover:bg-white/90"
+                            ? "bg-black text-white hover:bg-[#2E2E2E] active:bg-white active:text-black"
+                            : "bg-white text-black hover:bg-[#F0F0F0] active:bg-black active:text-white"
                         }`
                       : item.variant === "secondary"
                       ? `inline-flex items-center px-5 py-2.5 border text-[12px] xl:text-[13px] font-bold uppercase tracking-wider transition-all ${
@@ -166,7 +166,7 @@ export function Navbar() {
 
       <header
         className={`lg:hidden fixed top-0 left-0 right-0 z-50 h-14 transition-all duration-300 ${
-          isScrolled ? "bg-white border-b border-slate-200 shadow-sm" : "bg-transparent border-b border-transparent"
+          isScrolled ? "bg-[#FFFFFF] border-b border-slate-200 shadow-sm" : "bg-transparent border-b border-transparent"
         }`}
       >
         <div className="flex h-full items-center justify-between px-4">
@@ -187,7 +187,7 @@ export function Navbar() {
               >
                 Florida Badgers FCA
               </span>
-              <div className={`mt-1 h-[2px] w-full max-w-[150px] ${isScrolled ? "bg-[#1e3a5f]" : "bg-white"}`} />
+              <div className={`mt-1 h-[2px] w-full max-w-[150px] ${isScrolled ? "bg-[#B0B0B0]" : "bg-white"}`} />
             </div>
           </Link>
           <button
@@ -275,7 +275,7 @@ export function Navbar() {
                       onClick={closeMobileMenu}
                       className={
                         item.variant === "primary"
-                          ? "inline-flex items-center px-4 py-2 bg-[#1e3a5f] text-white text-[13px] font-bold uppercase tracking-wider"
+                          ? "inline-flex items-center px-4 py-2 bg-black text-white text-[13px] font-bold uppercase tracking-wider hover:bg-[#2E2E2E] active:bg-white active:text-black"
                           : item.variant === "secondary"
                           ? "inline-flex items-center px-4 py-2 border border-slate-300 text-slate-900 text-[13px] font-bold uppercase tracking-wider"
                           : "text-[15px] font-bold text-slate-900 uppercase tracking-wider"

@@ -207,7 +207,7 @@ export default function FirstTeamPage() {
             >
               Team Shop <ArrowRight size={16} />
             </Link>
-            <div className="relative w-12 h-12 border border-white/20 bg-black/20 p-1">
+            <div className="relative w-12 h-12 border border-slate-200 bg-white p-1">
               <Image src="/images/Florida Badgers.png" alt="Florida Badgers badge" fill className="object-contain p-1" />
             </div>
           </div>

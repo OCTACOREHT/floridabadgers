@@ -27,35 +27,35 @@ const SOCIAL_LINKS = [
 export function SiteFooter() {
   return (
     <>
-      <section className="bg-slate-800 py-14 md:py-20 px-6 xl:px-10 border-t border-white/10">
+      <section className="bg-[#B0B0B0] py-14 md:py-20 px-6 xl:px-10 border-t border-[#D9D9D9]">
         <div className="max-w-[1320px] mx-auto grid md:grid-cols-3 gap-8">
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 bg-[#2E2E2E] flex items-center justify-center flex-shrink-0">
               <MapPin size={18} className="text-white" />
             </div>
             <div>
-              <div className="font-bold text-sm uppercase tracking-wider text-white mb-1">Address</div>
-              <div className="text-white/60 text-sm">1901 N. Seacrest Blvd, Boynton Beach FL 33435</div>
+              <div className="font-bold text-sm uppercase tracking-wider text-black mb-1">Address</div>
+              <div className="text-[#2E2E2E] text-sm">1901 N. Seacrest Blvd, Boynton Beach FL 33435</div>
             </div>
           </div>
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 bg-[#2E2E2E] flex items-center justify-center flex-shrink-0">
               <Phone size={18} className="text-white" />
             </div>
             <div>
-              <div className="font-bold text-sm uppercase tracking-wider text-white mb-1">Phone</div>
-              <div className="text-white/60 text-sm">+1 914-426-1526</div>
-              <div className="text-white/60 text-sm">+1 305-988-9700</div>
+              <div className="font-bold text-sm uppercase tracking-wider text-black mb-1">Phone</div>
+              <div className="text-[#2E2E2E] text-sm">+1 914-426-1526</div>
+              <div className="text-[#2E2E2E] text-sm">+1 305-988-9700</div>
             </div>
           </div>
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 bg-[#2E2E2E] flex items-center justify-center flex-shrink-0">
               <Mail size={18} className="text-white" />
             </div>
             <div>
-              <div className="font-bold text-sm uppercase tracking-wider text-white mb-1">Email</div>
-              <div className="text-white/60 text-sm">info@floridabadgersfca.com</div>
-              <div className="text-white/60 text-sm">academy@floridabadgersfca.com</div>
+              <div className="font-bold text-sm uppercase tracking-wider text-black mb-1">Email</div>
+              <div className="text-[#2E2E2E] text-sm">info@floridabadgersfca.com</div>
+              <div className="text-[#2E2E2E] text-sm">academy@floridabadgersfca.com</div>
             </div>
           </div>
         </div>

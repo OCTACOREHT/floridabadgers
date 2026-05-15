@@ -423,7 +423,7 @@ export default function HomeContent({
               </motion.p>
 
               <motion.div variants={fadeUp} className="flex flex-wrap gap-3 sm:gap-4">
-                <Link href="/academy" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm sm:text-sm uppercase tracking-wider px-6 sm:px-7 py-3 sm:py-4 transition-all hover:bg-[#374151] hover:gap-3">
+                <Link href="/academy" className="inline-flex items-center gap-2 bg-[#B0B0B0] text-black font-bold text-sm sm:text-sm uppercase tracking-wider px-6 sm:px-7 py-3 sm:py-4 transition-all hover:bg-[#D9D9D9] hover:text-black active:bg-white active:text-black hover:gap-3">
                   Join the Academy <ArrowRight size={16} />
                 </Link>
                 <Link href="/schedule" className="inline-flex items-center gap-2 border border-white/40 text-white font-bold text-sm sm:text-sm uppercase tracking-wider px-6 sm:px-7 py-3 sm:py-4 transition-all hover:border-white hover:text-white bg-white/5 backdrop-blur-sm">
@@ -521,7 +521,7 @@ export default function HomeContent({
 
 
       {/* RESULTS & UPCOMING */}
-      <section className="bg-white py-20 px-6 xl:px-10 min-h-screen lg:min-h-0">
+      <section className="bg-[#FFFFFF] py-20 px-6 xl:px-10 min-h-screen lg:min-h-0">
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -781,7 +781,7 @@ export default function HomeContent({
             <div className="mt-6">
               <Link
                 href="/news"
-                className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3 hover:bg-[#374151] transition-all"
+                className="inline-flex items-center gap-2 bg-[#B0B0B0] text-black font-bold text-sm uppercase tracking-wider px-6 py-3 hover:bg-[#D9D9D9] hover:text-black active:bg-white active:text-black transition-all"
               >
                 View All News <ArrowRight size={14} />
               </Link>
@@ -789,8 +789,8 @@ export default function HomeContent({
           </div>
         </section>
       {/* MISSION */}
-      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
+      <section className="bg-[#B0B0B0] py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2E2E2E]" />
         <div className="max-w-[1320px] mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <motion.div
             initial="hidden"
@@ -799,25 +799,27 @@ export default function HomeContent({
             variants={stagger}
           >
             <motion.div variants={fadeUp}>
-              <SectionLabel>Who We Are</SectionLabel>
-              <h2 className="text-4xl xl:text-5xl font-black uppercase tracking-tight text-white mb-6">
+              <span className="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-[#2E2E2E] mb-3">
+                Who We Are
+              </span>
+              <h2 className="text-4xl xl:text-5xl font-black uppercase tracking-tight text-black mb-6">
                 One of the top football clubs
-                <span className="text-white"> in the USA</span>
+                <span className="text-black"> in the USA</span>
               </h2>
             </motion.div>
-            <motion.p variants={fadeUp} className="text-white/70 leading-relaxed mb-4">
+            <motion.p variants={fadeUp} className="text-[#2E2E2E] leading-relaxed mb-4">
               Founded in 2018 under the name Sharks FC, when Samson (Samy) saw a group of kids
               playing soccer on the side of the road and invited them to play in a more structured way.
             </motion.p>
-            <motion.p variants={fadeUp} className="text-white/70 leading-relaxed mb-8">
+            <motion.p variants={fadeUp} className="text-[#2E2E2E] leading-relaxed mb-8">
               What started as a small group of passionate youths has now become a deeply rooted and
               meaningful club - now known as Florida Badgers.
             </motion.p>
             <motion.div variants={fadeUp} className="flex gap-4">
-              <Link href="/academy/about" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#374151] transition-all">
+              <Link href="/academy/about" className="inline-flex items-center gap-2 bg-black text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#2E2E2E] hover:text-white active:bg-white active:text-black transition-all">
                 Read More <ArrowRight size={15} />
               </Link>
-              <Link href="/league" className="inline-flex items-center gap-2 border border-white/20 text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:border-white hover:text-white transition-all">
+              <Link href="/league" className="inline-flex items-center gap-2 border border-[#2E2E2E]/40 text-black font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:border-black hover:text-black transition-all">
                 Our League
               </Link>
             </motion.div>
@@ -927,7 +929,7 @@ export default function HomeContent({
               <div className="mt-7 flex flex-wrap gap-3">
                 <Link
                   href="/first-team/u23"
-                  className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#374151] transition-all"
+                  className="inline-flex items-center gap-2 bg-[#B0B0B0] text-black font-bold text-sm uppercase tracking-wider px-6 py-3.5 hover:bg-[#D9D9D9] hover:text-black active:bg-white active:text-black transition-all"
                 >
                   Read Full Announcement <ArrowRight size={15} />
                 </Link>
@@ -962,8 +964,8 @@ export default function HomeContent({
       </section>
 
       {/* ACADEMY */}
-      <section className="bg-slate-800 py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
-        <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#1e3a5f]" />
+      <section className="bg-[#B0B0B0] py-24 px-6 xl:px-10 relative overflow-hidden min-h-screen lg:min-h-0">
+        <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#2E2E2E]" />
         <div className="max-w-[1320px] mx-auto">
           <motion.div
             initial="hidden"
@@ -973,11 +975,13 @@ export default function HomeContent({
             className="text-center mb-16"
           >
             <motion.div variants={fadeUp}>
-              <SectionLabel>Youth Development</SectionLabel>
-              <h2 className="text-4xl xl:text-5xl font-black uppercase tracking-tight text-white mb-4">
+              <span className="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-slate-700 mb-3">
+                Youth Development
+              </span>
+              <h2 className="text-4xl xl:text-5xl font-black uppercase tracking-tight text-slate-900 mb-4">
                 Badgers Football Academy
               </h2>
-              <p className="text-white/60 max-w-2xl mx-auto leading-relaxed">
+              <p className="text-slate-800 max-w-2xl mx-auto leading-relaxed">
                 Give your child the chance to shine. At our football academy, children learn to
                 play football, develop their skills, improve technique, and make new friends.
               </p>
@@ -996,7 +1000,7 @@ export default function HomeContent({
               <motion.div key={cat} variants={fadeUp}>
                 <Link
                   href={`/academy/${cat.toLowerCase()}`}
-                  className="flex items-center justify-center w-20 h-20 border-2 border-white/50 text-white font-black text-lg hover:bg-white hover:text-black hover:border-white transition-all"
+                  className="flex items-center justify-center w-20 h-20 border-2 border-slate-700 text-slate-900 font-black text-lg hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all"
                 >
                   {cat}
                 </Link>
@@ -1040,7 +1044,7 @@ export default function HomeContent({
             variants={fadeUp}
             className="text-center"
           >
-            <Link href="/join" className="inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold uppercase tracking-wider px-10 py-4 hover:bg-[#374151] transition-all">
+            <Link href="/join" className="inline-flex items-center gap-2 bg-black text-white font-bold uppercase tracking-wider px-10 py-4 hover:bg-[#2E2E2E] hover:text-white active:bg-white active:text-black transition-all">
               Enroll Now <ArrowRight size={16} />
             </Link>
           </motion.div>
@@ -1061,7 +1065,7 @@ export default function HomeContent({
           </div>
           <Link
             href="/join"
-            className="flex-shrink-0 inline-flex items-center gap-2 bg-[#1e3a5f] text-white font-bold uppercase tracking-wider px-8 py-4 hover:bg-[#374151] transition-all"
+            className="flex-shrink-0 inline-flex items-center gap-2 bg-black text-white font-bold uppercase tracking-wider px-8 py-4 hover:bg-[#2E2E2E] active:bg-white active:text-black transition-all"
           >
             Register Now <ArrowRight size={16} />
           </Link>

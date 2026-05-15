@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, CheckCircle2, ChevronLeft, ShieldAlert, UserCheck } from "lucide-react";
 import ReCAPTCHA from "react-google-recaptcha";
@@ -16,13 +17,13 @@ type RegistrationForm = {
     | "stage_english";
   nom_complet: string;
   date_naissance: string;
-  sexe: "Masculin" | "Feminin";
+  sexe: "Male" | "Female" | "Masculin" | "Feminin";
   adresse: string;
   telephone: string;
   email: string;
   photo_url?: string; // new field for uploaded photo URL
-  poste_jeu: "Gardien" | "Defenseur" | "Milieu" | "Attaquant";
-  niveau_jeu: "Debutant" | "Intermediaire" | "Avance";
+  poste_jeu: "Goalkeeper" | "Defender" | "Midfielder" | "Forward" | "Gardien" | "Defenseur" | "Milieu" | "Attaquant";
+  niveau_jeu: "Beginner" | "Intermediate" | "Advanced" | "Debutant" | "Intermediaire" | "Avance";
   stage_periode: "weekend" | "holiday_camp" | "evening_sessions";
   stage_objectif: "technique" | "tactique" | "preparation_physique" | "gardien";
   club_actuel: string;
@@ -80,8 +81,8 @@ const REGISTRATION_PROGRAMS: Array<{
   },
   {
     value: "stage_english",
-    label: "Stage Registration",
-    description: "A single stage form with stage-specific fields.",
+    label: "Tryout Registration",
+    description: "A single tryout form with tryout-specific fields.",
   },
 ];
 
@@ -89,7 +90,7 @@ const REGISTRATION_PROGRAM_BADGES: Record<RegistrationForm["programme_inscriptio
   junior_foundation: "Club",
   junior_development: "Club",
   junior_elite: "Club",
-  stage_english: "Stage",
+  stage_english: "Tryout",
 };
 
 const STAGE_PERIODES: Array<{ value: RegistrationForm["stage_periode"]; label: string }> = [
@@ -152,6 +153,13 @@ function calculateAge(dateOfBirth: string): number | null {
   const monthDiff = today.getMonth() - birthDate.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
   return age;
+}
+
+function formatDateForInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -248,9 +256,20 @@ export default function JoinPage() {
 
 
   const age = useMemo(() => calculateAge(form.date_naissance), [form.date_naissance]);
+  const { minBirthDate, maxBirthDate } = useMemo(() => {
+    const today = new Date();
+    const youngestAllowed = new Date(today);
+    youngestAllowed.setFullYear(today.getFullYear() - 5);
+    const oldestAllowed = new Date(today);
+    oldestAllowed.setFullYear(today.getFullYear() - 40);
+
+    return {
+      minBirthDate: formatDateForInput(oldestAllowed),
+      maxBirthDate: formatDateForInput(youngestAllowed),
+    };
+  }, []);
   const isMinor = typeof age === "number" && age < 18;
   const isStageRegistration = form.programme_inscription === "stage_english";
-  const isJuniorRegistration = !isStageRegistration;
   const availableCategories = useMemo(() => {
     if (isStageRegistration) {
       return categories;
@@ -273,9 +292,13 @@ export default function JoinPage() {
     const matchByPattern = (pattern: RegExp) =>
       categories.find((category) => pattern.test(`${category.nom} ${category.description ?? ""}`));
 
-    if (age <= 10) return matchByPattern(/8|9|10|u10/i) ?? null;
-    if (age <= 13) return matchByPattern(/11|12|13|u13/i) ?? null;
-    if (age <= 17) return matchByPattern(/14|15|16|17|u17/i) ?? null;
+    if (age <= 5) return matchByPattern(/u5|\b5\b/i) ?? null;
+    if (age <= 7) return matchByPattern(/u7|\b6\b|\b7\b/i) ?? null;
+    if (age <= 9) return matchByPattern(/u9|\b8\b|\b9\b/i) ?? null;
+    if (age <= 11) return matchByPattern(/u11|\b10\b|\b11\b/i) ?? null;
+    if (age <= 13) return matchByPattern(/u13|\b12\b|\b13\b/i) ?? null;
+    if (age <= 15) return matchByPattern(/u15|\b14\b|\b15\b/i) ?? null;
+    if (age <= 17) return matchByPattern(/u17|\b16\b|\b17\b/i) ?? null;
     return matchByPattern(/18|senior|plus|adult/i) ?? null;
   }, [age, categories, isStageRegistration]);
   const resolvedCategoryId = isStageRegistration
@@ -289,7 +312,7 @@ export default function JoinPage() {
     () =>
       steps.map((item, index) => {
         if (index === 1 && isStageRegistration) {
-          return { ...item, title: "Stage Profile", subtitle: "Program objective and level" };
+          return { ...item, title: "Tryout Profile", subtitle: "Program objective and level" };
         }
         if (index === 4 && !isMinor) {
           return { ...item, title: "Consent", subtitle: "Adult consent and emergency approval" };
@@ -350,16 +373,13 @@ export default function JoinPage() {
       if (!form.adresse.trim()) return "Address is required.";
       if (!form.telephone.trim()) return "Phone number is required.";
       if (!form.email.trim()) return "Email is required.";
-      if (!age || age < 6 || age > 60) return "Date of birth is invalid for registration.";
-      if (isJuniorRegistration && age >= 18) {
-        return "Club registration is for under-18 players. Adults should use Stage registration.";
-      }
+      if (!age || age < 5 || age > 40) return "Date of birth is invalid for registration (allowed range: 5 to 40 years).";
     }
     if (currentStep === 1) {
       if (!resolvedCategoryId) return "Please choose a category.";
       if (isStageRegistration) {
-        if (!form.stage_periode) return "Please choose a stage period.";
-        if (!form.stage_objectif) return "Please choose a stage objective.";
+        if (!form.stage_periode) return "Please choose a tryout period.";
+        if (!form.stage_objectif) return "Please choose a tryout objective.";
       }
     }
     if (currentStep === 2) {
@@ -383,7 +403,7 @@ export default function JoinPage() {
     if (currentStep === 5) {
       if (!form.consentement_soins_urgence) return "Emergency care consent is required.";
       if (!form.accepte_regles_stage) {
-        return isStageRegistration ? "You must accept stage rules." : "You must accept club rules.";
+        return isStageRegistration ? "You must accept tryout rules." : "You must accept club rules.";
       }
       if (!form.confirme_infos_correctes) return "You must confirm all information is correct.";
     }
@@ -496,16 +516,16 @@ export default function JoinPage() {
         <div className="relative max-w-[1320px] mx-auto">
           <div className="text-xs font-bold uppercase tracking-[0.24em] text-white/70 mb-3">Register</div>
           <h1 className="text-4xl sm:text-5xl xl:text-6xl font-black uppercase tracking-tight leading-[1.02]">
-            {isStageRegistration ? "Stage Registration" : "Club Registration"}
+            {isStageRegistration ? "Tryout Registration" : "Club Registration"}
           </h1>
           <p className="mt-4 text-white/75 max-w-2xl leading-relaxed">
             {isStageRegistration
-              ? "Complete the stage registration form."
+              ? "Complete the tryout registration form."
               : "Complete the club registration form. Parent details are required for minors."}
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white">
-              {isStageRegistration ? "Stage Form" : "Junior Form"}
+              {isStageRegistration ? "Tryout Form" : "Junior Form"}
             </span>
             <span className="inline-flex items-center border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white">
               {typeof age === "number" ? (isMinor ? "Minor Player" : "Adult Player") : "Age Pending"}
@@ -604,7 +624,7 @@ export default function JoinPage() {
                 })}
               </div>
               <p className="mt-3 text-xs text-slate-600">
-                Parent/guardian and player can both use the club form. Stage has one separate form.
+                Parent/guardian and player can both use the club form. Tryout has one separate form.
               </p>
             </div>
 
@@ -634,7 +654,13 @@ export default function JoinPage() {
                       </div>
                       <div>
                         <FieldLabel>Date of Birth</FieldLabel>
-                        <Input type="date" value={form.date_naissance} onChange={(e) => update("date_naissance", e.target.value)} />
+                        <Input
+                          type="date"
+                          min={minBirthDate}
+                          max={maxBirthDate}
+                          value={form.date_naissance}
+                          onChange={(e) => update("date_naissance", e.target.value)}
+                        />
                       </div>
                       <div>
                         <FieldLabel>Sex</FieldLabel>
@@ -657,7 +683,15 @@ export default function JoinPage() {
                           className="w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#1e3a5f] file:text-white hover:file:bg-[#374151]"
                         />
                         {photoPreview && (
-                          <img src={photoPreview} alt="Preview" className="mt-2 max-h-48 rounded-lg object-cover" />
+                          <div className="relative mt-2 h-48 w-full max-w-sm overflow-hidden rounded-lg border border-slate-200">
+                            <Image
+                              src={photoPreview}
+                              alt="Preview"
+                              fill
+                              unoptimized
+                              className="object-cover"
+                            />
+                          </div>
                         )}
                         {uploadingPhoto && <p className="mt-1 text-xs text-[#1e3a5f] animate-pulse">Uploading...</p>}
                       </div>
@@ -677,7 +711,7 @@ export default function JoinPage() {
                 {step === 1 && (
                   <div>
                     <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900 mb-5">
-                      {isStageRegistration ? "Stage Profile" : "Club Profile"}
+                      {isStageRegistration ? "Tryout Profile" : "Club Profile"}
                     </h2>
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
@@ -704,7 +738,7 @@ export default function JoinPage() {
                       {isStageRegistration ? (
                         <>
                           <div>
-                            <FieldLabel>Stage Period</FieldLabel>
+                            <FieldLabel>Tryout Period</FieldLabel>
                             <Select
                               value={form.stage_periode}
                               onChange={(e) => update("stage_periode", e.target.value as RegistrationForm["stage_periode"])}
@@ -717,7 +751,7 @@ export default function JoinPage() {
                             </Select>
                           </div>
                           <div>
-                            <FieldLabel>Stage Objective</FieldLabel>
+                            <FieldLabel>Tryout Objective</FieldLabel>
                             <Select
                               value={form.stage_objectif}
                               onChange={(e) => update("stage_objectif", e.target.value as RegistrationForm["stage_objectif"])}
@@ -730,7 +764,7 @@ export default function JoinPage() {
                             </Select>
                           </div>
                           <div className="sm:col-span-2 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                            Stage group is assigned automatically from player age:{" "}
+                            Tryout group is assigned automatically from player age:{" "}
                             <span className="font-bold text-slate-900">{resolvedCategoryLabel}</span>
                           </div>
                         </>
@@ -994,7 +1028,7 @@ export default function JoinPage() {
                           {REGISTRATION_PROGRAMS.find((program) => program.value === form.programme_inscription)?.label ?? "-"}
                         </div>
                         <div className="text-sm text-slate-600 mt-1">
-                          {isStageRegistration ? "Stage form (English)" : "Junior club form"}
+                          {isStageRegistration ? "Tryout form (English)" : "Junior club form"}
                         </div>
                       </div>
                       <div className="border border-slate-200 bg-slate-50 p-4">
@@ -1011,10 +1045,10 @@ export default function JoinPage() {
                         {isStageRegistration && (
                           <>
                             <div className="text-sm text-slate-600 mt-1">
-                              Stage period: {STAGE_PERIODES.find((period) => period.value === form.stage_periode)?.label ?? "-"}
+                              Tryout period: {STAGE_PERIODES.find((period) => period.value === form.stage_periode)?.label ?? "-"}
                             </div>
                             <div className="text-sm text-slate-600">
-                              Stage objective: {STAGE_OBJECTIFS.find((objectif) => objectif.value === form.stage_objectif)?.label ?? "-"}
+                              Tryout objective: {STAGE_OBJECTIFS.find((objectif) => objectif.value === form.stage_objectif)?.label ?? "-"}
                             </div>
                           </>
                         )}
@@ -1061,7 +1095,7 @@ export default function JoinPage() {
                           className="h-4 w-4 mt-0.5 accent-[#1e3a5f]"
                         />
                         {isStageRegistration
-                          ? "I accept stage rules and participation guidelines."
+                          ? "I accept tryout rules and participation guidelines."
                           : "I accept club rules and training guidelines."}
                       </label>
                       <label className="flex items-start gap-3 border border-slate-200 bg-white p-3 text-sm text-slate-700">

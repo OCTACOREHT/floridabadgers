@@ -32,19 +32,19 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get('file');
 
-    if (!file || !(file instanceof Blob)) {
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // Generate a safe, unique filename.
-    const originalName = (file as any).name || 'upload';
+    const originalName = file.name || 'upload';
     const timestamp = Date.now();
     const safeName = originalName.replace(/[^a-zA-Z0-9.\-_/]/g, '_');
     const filename = `${timestamp}-${safeName}`;
     const filePath = path.join(UPLOAD_DIR, filename);
 
     // Read the file into an ArrayBuffer and write it to disk.
-    const arrayBuffer = await (file as Blob).arrayBuffer();
+    const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     await fs.writeFile(filePath, buffer);
 

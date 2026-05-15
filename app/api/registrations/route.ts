@@ -51,12 +51,6 @@ type LegacyValueSet = {
   niveau_jeu: string;
 };
 
-const JUNIOR_PROGRAMS = new Set<RegistrationInput["programme_inscription"]>([
-  "junior_foundation",
-  "junior_development",
-  "junior_elite",
-]);
-
 function isRegistrationProgram(value: unknown): value is RegistrationInput["programme_inscription"] {
   return (
     value === "junior_foundation" ||
@@ -209,11 +203,10 @@ export async function POST(request: NextRequest) {
     }
 
     const isStageRegistration = body.programme_inscription === "stage_english";
-    const isJuniorRegistration = JUNIOR_PROGRAMS.has(body.programme_inscription);
 
     const age = calculateAge(body.date_naissance as string);
-    if (Number.isNaN(age) || age < 6 || age > 60) {
-      return NextResponse.json({ error: "Invalid date of birth." }, { status: 400 });
+    if (Number.isNaN(age) || age < 5 || age > 40) {
+      return NextResponse.json({ error: "Invalid date of birth. Allowed range is 5 to 40 years." }, { status: 400 });
     }
 
     const supabase = createSupabaseServiceClient();
@@ -228,13 +221,6 @@ export async function POST(request: NextRequest) {
     if (categoryError || !category?.nom) {
       return NextResponse.json(
         { error: "Could not find the selected category." },
-        { status: 400 }
-      );
-    }
-
-    if (isJuniorRegistration && age >= 18) {
-      return NextResponse.json(
-        { error: "Junior registration is only for players under 18. Choose Stage (English) for adults." },
         { status: 400 }
       );
     }
@@ -325,7 +311,7 @@ export async function POST(request: NextRequest) {
         {
           error:
             error.message ??
-            "Stage registration failed. Ensure the 'inscriptions_stage' table exists and migrations are applied.",
+            "Tryout registration failed. Ensure the 'inscriptions_stage' table exists and migrations are applied.",
         },
         { status: 500 }
       );
