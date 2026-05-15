@@ -79,6 +79,18 @@ function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function generateRegistrationId(fullName: string): string {
+  const initials = fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.substring(0, 2).toUpperCase())
+    .join("")
+    .slice(0, 6);
+
+  const randomSuffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `FBCA-${initials || "PL"}-${randomSuffix}`;
+}
+
 function shouldFallbackToLegacy(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
   if (error.code === "42703" || error.code === "23514") return true;
@@ -235,17 +247,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate shorter custom Registration ID: FBCA-[INITIALS]-[SHORTID]
-    const nameParts = normalizeText(body.nom_complet).split(/\s+/);
-    const initials = nameParts.map(part => part.substring(0, 2).toUpperCase()).join("");
-    const shortId = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const customRegId = `FBCA-${initials}-${shortId}`;
-
+    const normalizedFullName = normalizeText(body.nom_complet);
+    const registrationId = generateRegistrationId(normalizedFullName);
     const legacyCandidate = mapLegacyWithAccents(body as RegistrationInput);
 
     const payload = {
       programme_inscription: body.programme_inscription,
-      nom_complet: normalizeText(body.nom_complet),
+      nom_complet: normalizedFullName,
       date_naissance: body.date_naissance,
       age,
       sexe: legacyCandidate.sexe,
@@ -259,7 +267,7 @@ export async function POST(request: NextRequest) {
       experience_football: normalizeText(body.experience_football) || null,
       categorie_id: body.categorie_id,
       categorie_age: category.nom, // Use the real category name (U5-U23)
-      registration_id: customRegId, // New field
+      registration_id: registrationId,
       inscrit_par: isMinor ? body.inscrit_par : "joueur",
       relation_avec_joueur: isMinor ? normalizeText(body.relation_avec_joueur) || null : null,
       probleme_sante: Boolean(body.probleme_sante),
@@ -288,7 +296,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from(targetTable)
       .insert(payload)
-      .select("id, created_at, statut")
+      .select("id, registration_id, created_at, statut")
       .single();
 
     if (!error) {
@@ -298,6 +306,7 @@ export async function POST(request: NextRequest) {
         source: "registration-api",
         metadata: {
           registrationId: data.id,
+          customRegistrationId: data.registration_id,
           targetTable,
           programme: body.programme_inscription,
         },
@@ -326,7 +335,7 @@ export async function POST(request: NextRequest) {
 
     for (const candidate of legacyCandidates) {
       const legacyPayload = {
-        nom_complet: normalizeText(body.nom_complet),
+        nom_complet: normalizedFullName,
         date_naissance: body.date_naissance,
         age,
         sexe: candidate.sexe,
@@ -339,7 +348,7 @@ export async function POST(request: NextRequest) {
         club_actuel: normalizeText(body.club_actuel) || null,
         experience_football: normalizeText(body.experience_football) || null,
         categorie_age: category.nom,
-        registration_id: customRegId,
+        registration_id: registrationId,
         probleme_sante: Boolean(body.probleme_sante),
         probleme_sante_details: normalizeText(body.probleme_sante_details) || null,
         allergies_connues: normalizeText(body.allergies_connues) || null,
@@ -358,7 +367,7 @@ export async function POST(request: NextRequest) {
       const legacyInsert = await supabase
         .from("inscriptions_joueurs")
         .insert(legacyPayload)
-        .select("id, created_at, statut")
+        .select("id, registration_id, created_at, statut")
         .single();
 
       if (!legacyInsert.error) {
@@ -368,6 +377,7 @@ export async function POST(request: NextRequest) {
           source: "registration-api",
           metadata: {
             registrationId: legacyInsert.data.id,
+            customRegistrationId: legacyInsert.data.registration_id,
             targetTable: "inscriptions_joueurs",
             programme: body.programme_inscription,
             legacySchema: true,

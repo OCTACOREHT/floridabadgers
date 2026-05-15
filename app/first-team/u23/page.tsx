@@ -38,7 +38,7 @@ const launchMilestones = [
   { label: "Launch", value: "May 10, 2026" },
   { label: "Competition", value: "Not Announced Yet" },
   { label: "Tryouts Start", value: "May 23, 2026" },
-  { label: "Tryout Time", value: "7:00 AM" },
+  { label: "Tryout Time", value: "6:00 PM - 8:00 PM" },
 ];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -163,7 +163,7 @@ export default function U23Page() {
                 <Phone size={17} className="mt-0.5" />
                 <div>
                   <p className="text-xs uppercase tracking-wider text-white/60">Tryout Start</p>
-                  <p className="font-bold">May 23, 2026 - 7:00 AM</p>
+                  <p className="font-bold">May 23, 2026 - 6:00 PM to 8:00 PM</p>
                 </div>
               </div>
             </div>
@@ -198,7 +198,7 @@ export default function U23Page() {
                   <Users size={16} className="mt-0.5 text-slate-800" />
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Schedule</p>
-                    <p className="mt-1 font-semibold">Starts May 23, 2026 - 7:00 AM</p>
+                    <p className="mt-1 font-semibold">Starts May 23, 2026 - 6:00 PM to 8:00 PM</p>
                   </div>
                 </div>
               </article>

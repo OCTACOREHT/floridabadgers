@@ -37,6 +37,11 @@ type SiteEventClickRow = {
   metadata: Record<string, unknown> | null;
 };
 
+const TABLES_WITH_VIRTUAL_REGISTRATION_ID = new Set([
+  "inscriptions_joueurs",
+  "inscriptions_stage",
+]);
+
 const TABLE_CONFIGS = {
   users: {
     table: "users",
@@ -100,7 +105,6 @@ const TABLE_CONFIGS = {
     description: "Manage junior program applications",
     listColumns: ["registration_id", "nom_complet", "programme_inscription", "categorie_age", "statut", "created_at"],
     createFields: [
-      { key: "registration_id", label: "Registration ID", type: "text" },
       {
         key: "programme_inscription",
         label: "Program",
@@ -149,7 +153,7 @@ const TABLE_CONFIGS = {
     table: "inscriptions_stage",
     label: "Stage Registrations",
     description: "Stage (English) registrations",
-    listColumns: ["nom_complet", "programme_inscription", "statut", "email", "telephone", "created_at"],
+    listColumns: ["registration_id", "nom_complet", "programme_inscription", "statut", "email", "telephone", "created_at"],
     createFields: [
       { key: "programme_inscription", label: "Program", type: "select", required: true, options: ["stage_english"] },
       { key: "nom_complet", label: "Full Name", type: "text", required: true },
@@ -270,6 +274,26 @@ function extractArticleIdFromMetadata(metadata: Record<string, unknown> | null):
   return trimmed;
 }
 
+function computeRegistrationId(row: Record<string, unknown>): string {
+  if (row.registration_id) return String(row.registration_id);
+
+  const nameParts = String(row.nom_complet || "PLAYER").split(/\s+/).filter(Boolean);
+  const initials = nameParts.map((part) => part.substring(0, 2).toUpperCase()).join("");
+  const idChunk = String(row.id || "").substring(0, 4).toUpperCase();
+  return `FBCA-${initials || "PL"}-${idChunk || "0000"}`;
+}
+
+function withVirtualColumns(table: string, rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  if (!TABLES_WITH_VIRTUAL_REGISTRATION_ID.has(table)) {
+    return rows;
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    registration_id: computeRegistrationId(row),
+  }));
+}
+
 function coerceFieldValue(field: DashboardTableField, value: unknown): unknown {
   if (field.type === "boolean") {
     if (typeof value === "boolean") return value;
@@ -373,9 +397,13 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
   const supabase = createSupabaseServiceClient();
   const safeLimit = Math.max(1, Math.min(limit, 300));
 
+  const virtualColumns = TABLES_WITH_VIRTUAL_REGISTRATION_ID.has(table)
+    ? new Set(["registration_id"])
+    : new Set<string>();
+
   const selectColumns = Array.from(
     new Set(["id", ...config.listColumns, ...config.createFields.map((field) => field.key)])
-  );
+  ).filter((column) => !virtualColumns.has(column));
   const selectExpr = selectColumns.join(", ");
 
   const { data, error } = await supabase
@@ -391,7 +419,8 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
     throw new Error(error.message);
   }
 
-  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  const rawRows = (data ?? []) as unknown as Record<string, unknown>[];
+  const rows = withVirtualColumns(table, rawRows);
   if (table !== "actualites" || rows.length === 0) {
     return rows;
   }

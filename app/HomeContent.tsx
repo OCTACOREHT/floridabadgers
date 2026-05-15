@@ -71,7 +71,7 @@ const u23Highlights = [
   { label: "Competition", value: "Not Announced Yet" },
   { label: "Status", value: "No Official Fixtures Yet" },
   { label: "Tryouts Start", value: "May 23, 2026" },
-  { label: "Tryout Time", value: "7:00 AM" },
+  { label: "Tryout Time", value: "6:00 PM - 8:00 PM" },
 ];
 
 // ANIMATIONS
@@ -466,15 +466,15 @@ export default function HomeContent({
                 className="w-full max-w-[430px] lg:max-w-[440px] flex-shrink-0 lg:mb-10"
               >
                 <div
-                  className="relative overflow-hidden rounded-[6px] border border-[#30415c]"
-                  style={{ background: "rgba(32,45,67,0.96)", backdropFilter: "blur(10px)" }}
+                  className="relative overflow-hidden rounded-[6px] border border-[#D9D9D9]"
+                  style={{ background: "rgba(176,176,176,0.96)", backdropFilter: "blur(10px)" }}
                 >
                   <div className="grid grid-cols-[auto_auto_auto] items-stretch h-full">
                     <div className="pl-3.5 pr-1.5 sm:pl-4 sm:pr-2 md:pl-4 md:pr-2 pt-2.5 pb-2 sm:pt-2.5 sm:pb-2 md:pt-2.5 md:pb-2 flex flex-col justify-start text-left">
-                      <p className="text-[7px] sm:text-[7px] md:text-[8px] uppercase tracking-[0.16em] text-[#7d8ca3] leading-[1.05]">
+                      <p className="text-[7px] sm:text-[7px] md:text-[8px] uppercase tracking-[0.16em] text-[#2E2424] leading-[1.05]">
                         Next Match
                       </p>
-                      <p className="mt-1 text-[16px] sm:text-[16px] md:text-[22px] uppercase font-bold tracking-[0.01em] text-white leading-[0.9]">
+                      <p className="mt-1 text-[16px] sm:text-[16px] md:text-[22px] uppercase font-bold tracking-[0.01em] text-black leading-[0.9]">
                         VS {opponentTopLine}
                         {opponentBottomLine && (
                           <>
@@ -486,7 +486,7 @@ export default function HomeContent({
                     </div>
 
                     <div className="relative flex items-center justify-center px-0.5 sm:px-1">
-                      <div className="absolute inset-y-2 md:inset-y-3 left-1/2 -translate-x-1/2 border-l-4 border-dotted border-[#081324]" />
+                      <div className="absolute inset-y-2 md:inset-y-3 left-1/2 -translate-x-1/2 border-l-4 border-dotted border-[#2E2424]" />
                     </div>
 
                     <div className="pl-2.5 pr-2 sm:pl-3 sm:pr-3 md:pl-4 md:pr-3 pt-2.5 pb-2 flex flex-col justify-center min-w-[140px] sm:min-w-[160px] md:min-w-[200px]">
@@ -498,16 +498,16 @@ export default function HomeContent({
                           { label: "Secs", value: countdown.seconds },
                         ].map(({ label, value }) => (
                           <div key={label} className="flex flex-col items-center justify-center min-w-0">
-                            <span className="text-[20px] sm:text-[22px] md:text-[26px] font-black tabular-nums text-white leading-none">
+                            <span className="text-[20px] sm:text-[22px] md:text-[26px] font-black tabular-nums text-black leading-none">
                               {String(value).padStart(2, "0")}
                             </span>
-                            <span className="mt-1 text-[5px] sm:text-[6px] md:text-[7px] uppercase tracking-[0.1em] text-[#7f8ba0] font-bold">
+                            <span className="mt-1 text-[5px] sm:text-[6px] md:text-[7px] uppercase tracking-[0.1em] text-[#2E2424] font-bold">
                               {label}
                             </span>
                           </div>
                         ))}
                       </div>
-                      <p className="mt-2 text-center md:text-right text-[5px] sm:text-[5px] md:text-[6px] uppercase tracking-[0.16em] text-[#6e7b8f] font-medium truncate">
+                      <p className="mt-2 text-center md:text-right text-[5px] sm:text-[5px] md:text-[6px] uppercase tracking-[0.16em] text-[#2E2424] font-medium truncate">
                         {nextVenue}
                       </p>
                     </div>
