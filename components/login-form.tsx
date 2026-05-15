@@ -3,7 +3,6 @@
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
-import ReCAPTCHA from "react-google-recaptcha"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -49,7 +48,6 @@ export function LoginForm({
   const [password, setPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -67,7 +65,6 @@ export function LoginForm({
         body: JSON.stringify({
           email: normalizedEmail,
           password,
-          captchaToken,
         }),
       })
 
@@ -154,14 +151,6 @@ export function LoginForm({
                   <p className="text-sm font-medium text-red-600">{errorMessage}</p>
                 </Field>
               ) : null}
-              <Field>
-                <div className="flex justify-center py-4">
-                  <ReCAPTCHA
-                    sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
-                    onChange={(token) => setCaptchaToken(token)}
-                  />
-                </div>
-              </Field>
               <Field>
                 <Button
                   type="submit"

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, CheckCircle2, ChevronLeft, ShieldAlert, UserCheck } from "lucide-react";
-import ReCAPTCHA from "react-google-recaptcha";
 
 
 
@@ -243,7 +242,6 @@ export default function JoinPage() {
   const [formError, setFormError] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (successMessage) {
@@ -489,7 +487,7 @@ export default function JoinPage() {
       const response = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, captchaToken }),
+        body: JSON.stringify(payload),
       });
 
       const result = (await response.json()) as { error?: string; registration?: { id: string } };
@@ -1109,12 +1107,6 @@ export default function JoinPage() {
                       </label>
                     </div>
 
-                    <div className="mt-8 flex justify-start">
-                      <ReCAPTCHA
-                        sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
-                        onChange={(token) => setCaptchaToken(token)}
-                      />
-                    </div>
                   </div>
                 )}
               </motion.div>

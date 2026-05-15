@@ -26,6 +26,11 @@ export const metadata: Metadata = {
   title: "Florida Badgers FCA - Football Club",
   description:
     "Florida Badgers FCA is one of the top football clubs in the USA. Based in Boynton Beach, FL.",
+  icons: {
+    icon: "/favicon.ico?v=2",
+    shortcut: "/favicon.ico?v=2",
+    apple: "/images/florida-badgers-icon.png?v=2",
+  },
 };
 
 export default function RootLayout({

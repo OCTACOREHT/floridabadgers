@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { trackSiteEvent } from "@/lib/analytics/events";
-import { verifyRecaptchaToken } from "@/lib/recaptcha";
 
 type RegistrationInput = {
   programme_inscription:
@@ -42,7 +41,6 @@ type RegistrationInput = {
   signature_date?: string | null;
   signature_parent_nom?: string | null;
   signature_parent_date?: string | null;
-  captchaToken?: string;
 };
 
 type LegacyValueSet = {
@@ -169,11 +167,6 @@ function buildLegacyValueCandidates(input: RegistrationInput): LegacyValueSet[] 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<RegistrationInput>;
-
-    const captchaResult = await verifyRecaptchaToken(body.captchaToken);
-    if (!captchaResult.success) {
-      return NextResponse.json({ error: captchaResult.error || "CAPTCHA verification failed." }, { status: 403 });
-    }
 
     const requiredFields = [
       "programme_inscription",

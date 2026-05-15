@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { ArrowRight } from "lucide-react";
-import ReCAPTCHA from "react-google-recaptcha";
 
 type ContactFormState = {
   name: string;
@@ -24,7 +23,6 @@ export function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!successMessage) return;
@@ -52,7 +50,7 @@ export function ContactForm() {
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, captchaToken }),
+        body: JSON.stringify(form),
       });
 
       const result = (await response.json()) as { error?: string; message?: string };
@@ -148,13 +146,6 @@ export function ContactForm() {
           {errorMessage}
         </p>
       )}
-
-      <div className="sm:col-span-2 flex justify-start my-4">
-        <ReCAPTCHA
-          sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
-          onChange={(token) => setCaptchaToken(token)}
-        />
-      </div>
 
       <div className="sm:col-span-2 pt-2">
         <button
