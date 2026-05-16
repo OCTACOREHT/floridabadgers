@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
     {
       full_name: fullName || deriveFallbackName(email),
       email,
-      role: "user",
+      role: "admin",
     },
     { onConflict: "email" }
   )

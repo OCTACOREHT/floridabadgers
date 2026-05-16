@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { KeyRound, ShieldUser, UserPlus } from "lucide-react"
+import { KeyRound, UserPlus } from "lucide-react"
 
 import {
   SidebarGroup,
@@ -16,14 +16,9 @@ import { isActivePath } from "@/components/sidebar-nav"
 
 const adminItems = [
   {
-    title: "Add User",
+    title: "Users",
     href: "/dashboard/tables/users",
     icon: UserPlus,
-  },
-  {
-    title: "Roles",
-    href: "/dashboard/admin/roles",
-    icon: ShieldUser,
   },
   {
     title: "Password Reset",
@@ -37,7 +32,7 @@ export function NavAdmin() {
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Administration</SidebarGroupLabel>
+      <SidebarGroupLabel>Settings</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {adminItems.map((item) => {

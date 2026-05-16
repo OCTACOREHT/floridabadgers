@@ -10,6 +10,7 @@ type FieldKind =
   | "datetime"
   | "uuid"
   | "select"
+  | "password"
   | "json";
 
 export type DashboardTableField = {
@@ -20,6 +21,8 @@ export type DashboardTableField = {
   defaultValue?: unknown;
   placeholder?: string;
   options?: string[];
+  sensitive?: boolean;
+  transient?: boolean;
 };
 
 export type DashboardTableConfig = {
@@ -39,6 +42,16 @@ type SiteEventClickRow = {
   metadata: Record<string, unknown> | null;
 };
 
+type RegistrationParentLookupRow = {
+  player_id: string | null;
+  nom_parent_tuteur: string | null;
+  telephone_parent_tuteur: string | null;
+  nom_complet: string | null;
+  email: string | null;
+  telephone: string | null;
+  created_at: string | null;
+};
+
 const TABLES_WITH_VIRTUAL_REGISTRATION_ID = new Set([
   "inscriptions_joueurs",
   "inscriptions_stage",
@@ -47,13 +60,15 @@ const TABLES_WITH_VIRTUAL_REGISTRATION_ID = new Set([
 const TABLE_CONFIGS = {
   users: {
     table: "users",
-    label: "Users",
-    description: "Club users and roles",
-    listColumns: ["full_name", "email", "role", "photo_url", "created_at"],
+    label: "Account Management",
+    description: "Manage system accounts, roles, and access levels",
+    listColumns: ["full_name", "email", "role", "created_at"],
     createFields: [
       { key: "full_name", label: "Full Name", type: "text", required: true },
-      { key: "email", label: "Email", type: "email", required: true },
-      { key: "role", label: "Role", type: "select", required: true, options: ["user", "player"] },
+      { key: "email", label: "Email Address", type: "text", required: true },
+      { key: "role", label: "Role", type: "select", required: true, options: ["admin", "finance", "media"] },
+      { key: "password", label: "Password", type: "password", required: true, transient: true },
+      { key: "confirm_password", label: "Confirm Password", type: "password", required: true, transient: true },
       { key: "photo_url", label: "Photo", type: "text", placeholder: "Ajouter une photo" },
     ],
   },
@@ -91,10 +106,10 @@ const TABLE_CONFIGS = {
       { key: "photo_url", label: "Photo", type: "text", placeholder: "Ajouter une photo" },
       { key: "date_naissance", label: "Birth Date", type: "date" },
       { key: "age", label: "Age", type: "number" },
-      { key: "sexe", label: "Sex", type: "select", options: ["Masculin", "Feminin"] },
+      { key: "sexe", label: "Sex", type: "select", options: ["Masculin", "Féminin"] },
       { key: "categorie_id", label: "Category ID", type: "uuid" },
-      { key: "poste", label: "Position", type: "select", options: ["Gardien", "Defenseur", "Milieu", "Attaquant"] },
-      { key: "niveau", label: "Level", type: "select", options: ["Debutant", "Intermediaire", "Avance"] },
+      { key: "poste", label: "Position", type: "select", options: ["Gardien", "Défenseur", "Milieu", "Attaquant"] },
+      { key: "niveau", label: "Level", type: "select", options: ["Débutant", "Intermédiaire", "Avancé"] },
       { key: "dossard", label: "Jersey Number", type: "number" },
       { key: "taille", label: "Height", type: "text" },
       { key: "poids", label: "Weight", type: "text" },
@@ -117,13 +132,13 @@ const TABLE_CONFIGS = {
       { key: "nom_complet", label: "Full Name", type: "text", required: true },
       { key: "date_naissance", label: "Birth Date", type: "date", required: true },
       { key: "age", label: "Age", type: "number", required: true },
-      { key: "sexe", label: "Sex", type: "select", required: true, options: ["Masculin", "Feminin"] },
+      { key: "sexe", label: "Sex", type: "select", required: true, options: ["Masculin", "Féminin"] },
       { key: "adresse", label: "Address", type: "text", required: true },
       { key: "telephone", label: "Phone", type: "text", required: true },
       { key: "email", label: "Email", type: "email", required: true },
       { key: "photo_url", label: "Photo", type: "text" },
-      { key: "poste_jeu", label: "Position", type: "select", required: true, options: ["Gardien", "Defenseur", "Milieu", "Attaquant"] },
-      { key: "niveau_jeu", label: "Level", type: "select", required: true, options: ["Debutant", "Intermediaire", "Avance"] },
+      { key: "poste_jeu", label: "Position", type: "select", required: true, options: ["Gardien", "Défenseur", "Milieu", "Attaquant"] },
+      { key: "niveau_jeu", label: "Level", type: "select", required: true, options: ["Débutant", "Intermédiaire", "Avancé"] },
       { key: "club_actuel", label: "Current Club", type: "text" },
       { key: "experience_football", label: "Football Experience", type: "textarea" },
       { key: "categorie_id", label: "Category ID", type: "uuid", required: true },
@@ -243,6 +258,40 @@ const TABLE_CONFIGS = {
       { key: "is_active", label: "Active", type: "boolean", defaultValue: true },
     ],
   },
+  paiements: {
+    table: "paiements",
+    label: "Finance & Payments",
+    description: "Manage registration fees ($150) and monthly dues ($50)",
+    listColumns: ["joueur_id", "montant", "type_frais", "methode_paiement", "date_paiement", "statut"],
+    createFields: [
+      { key: "joueur_id", label: "Player", type: "uuid", required: true },
+      { key: "montant", label: "Amount ($)", type: "number", required: true, defaultValue: 50 },
+      { 
+        key: "type_frais", 
+        label: "Fee Type", 
+        type: "select", 
+        required: true, 
+        options: ["registration", "monthly", "equipment", "other"] 
+      },
+      { 
+        key: "methode_paiement", 
+        label: "Method", 
+        type: "select", 
+        required: true, 
+        options: ["transfer", "zelle", "cash", "card", "check"] 
+      },
+      { 
+        key: "statut", 
+        label: "Status", 
+        type: "select", 
+        required: true, 
+        defaultValue: "paid",
+        options: ["paid", "pending", "cancelled"] 
+      },
+      { key: "date_paiement", label: "Payment Date", type: "date", required: true },
+      { key: "notes", label: "Notes / Reference", type: "textarea" },
+    ],
+  },
 } satisfies Record<string, DashboardTableConfig>;
 
 export type DashboardTableName = keyof typeof TABLE_CONFIGS;
@@ -317,14 +366,92 @@ function withVirtualColumns(table: string, rows: Record<string, unknown>[]): Rec
   }));
 }
 
+async function withPaymentRegistrationDetails(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  rows: Record<string, unknown>[]
+): Promise<Record<string, unknown>[]> {
+  if (rows.length === 0) return rows;
+
+  const playerIds = Array.from(
+    new Set(
+      rows
+        .map((row) => row.joueur_id)
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    )
+  );
+
+  if (playerIds.length === 0) return rows;
+
+  const parentByPlayerId = new Map<string, RegistrationParentLookupRow>();
+  const registerRows = (items: RegistrationParentLookupRow[]) => {
+    for (const item of items) {
+      const playerId = typeof item.player_id === "string" ? item.player_id : "";
+      if (!playerId) continue;
+
+      const existing = parentByPlayerId.get(playerId);
+      const existingTime = existing?.created_at ? new Date(existing.created_at).getTime() : 0;
+      const currentTime = item.created_at ? new Date(item.created_at).getTime() : 0;
+
+      if (!existing || currentTime >= existingTime) {
+        parentByPlayerId.set(playerId, item);
+      }
+    }
+  };
+
+  const queryParentRows = async (tableName: "inscriptions_joueurs" | "inscriptions_stage") => {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select(
+        "player_id, nom_parent_tuteur, telephone_parent_tuteur, nom_complet, email, telephone, created_at"
+      )
+      .in("player_id", playerIds)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      if (isMissingTableError(error) || error.code === "42703") return [];
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as RegistrationParentLookupRow[];
+  };
+
+  const [juniorRows, stageRows] = await Promise.all([
+    queryParentRows("inscriptions_joueurs"),
+    queryParentRows("inscriptions_stage"),
+  ]);
+
+  registerRows(juniorRows);
+  registerRows(stageRows);
+
+  return rows.map((row) => {
+    const playerId = typeof row.joueur_id === "string" ? row.joueur_id : "";
+    const parentInfo = playerId ? parentByPlayerId.get(playerId) : undefined;
+
+    return {
+      ...row,
+      parent_name: parentInfo?.nom_parent_tuteur ?? null,
+      parent_phone: parentInfo?.telephone_parent_tuteur ?? null,
+      registration_player_name: parentInfo?.nom_complet ?? null,
+      registration_email: parentInfo?.email ?? null,
+      registration_phone: parentInfo?.telephone ?? null,
+    };
+  });
+}
+
 function buildSelectExpression(table: string, config: DashboardTableConfig): string {
   const virtualColumns = TABLES_WITH_VIRTUAL_REGISTRATION_ID.has(table)
     ? new Set(["registration_id"])
     : new Set<string>();
 
   const selectColumns = Array.from(
-    new Set(["id", ...config.listColumns, ...config.createFields.map((field) => field.key)])
+    new Set(["id", ...config.listColumns, ...config.createFields.filter(f => !f.sensitive && !f.transient).map((field) => field.key)])
   ).filter((column) => !virtualColumns.has(column));
+
+  // Include related player identity when listing payments so the UI can show names
+  // instead of raw UUIDs in the "Player" column.
+  if (table === "paiements" && !selectColumns.includes("joueurs(prenom, nom)")) {
+    selectColumns.push("joueurs(prenom, nom)");
+  }
 
   return selectColumns.join(", ");
 }
@@ -447,7 +574,13 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
   }
 
   const rawRows = (data ?? []) as unknown as Record<string, unknown>[];
-  const rows = withVirtualColumns(table, rawRows);
+  let rows = withVirtualColumns(table, rawRows);
+
+  if (table === "paiements") {
+    rows = await withPaymentRegistrationDetails(supabase, rows);
+    return rows;
+  }
+
   if (table !== "actualites" || rows.length === 0) {
     return rows;
   }

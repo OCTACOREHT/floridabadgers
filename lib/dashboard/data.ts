@@ -729,3 +729,177 @@ export async function getDashboardRegistrationRows(limit = 80): Promise<Dashboar
     })
     .slice(0, normalizedLimit);
 }
+export type DashboardFinanceData = {
+  totalRevenueMonth: number;
+  registrationRevenueMonth: number;
+  monthlyRevenueMonth: number;
+  revenueTrendPct: number;
+  chartData: Array<{ month: string; amount: number }>;
+  recentPayments: Array<{
+    id: string;
+    joueur_nom: string;
+    montant: number;
+    type: string;
+    methode: string;
+    date: string;
+  }>;
+};
+
+export async function getDashboardFinanceData(): Promise<DashboardFinanceData> {
+  const supabase = createSupabaseServiceClient();
+  const now = new Date();
+  const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const prevMonthStart = shiftMonths(now, -1).toISOString();
+
+  const [currentPayments, prevPayments, recentRaw] = await Promise.all([
+    supabase.from("paiements").select("*").gte("date_paiement", currentMonthStart),
+    supabase.from("paiements").select("*").gte("date_paiement", prevMonthStart).lt("date_paiement", currentMonthStart),
+    supabase.from("paiements")
+      .select("*, joueurs(prenom, nom)")
+      .order("date_paiement", { ascending: false })
+      .limit(5)
+  ]);
+
+  const currentData = currentPayments.data || [];
+  const prevData = prevPayments.data || [];
+  
+  const totalRevenueMonth = currentData.reduce((acc, p) => acc + Number(p.montant), 0);
+  const prevRevenueMonth = prevData.reduce((acc, p) => acc + Number(p.montant), 0);
+  
+  const registrationRevenueMonth = currentData
+    .filter(p => p.type_frais === "registration")
+    .reduce((acc, p) => acc + Number(p.montant), 0);
+    
+  const monthlyRevenueMonth = currentData
+    .filter(p => p.type_frais === "monthly")
+    .reduce((acc, p) => acc + Number(p.montant), 0);
+
+  // 1. Get current local month and year to avoid UTC offsets shifting the month
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-11
+
+  // 2. Calculate the start date for the 6-month window (exactly 5 months ago from the 1st of this month)
+  const startDate = new Date(currentYear, currentMonth - 5, 1);
+  const rangeStart = startDate.toISOString().split('T')[0]; // Use YYYY-MM-DD for consistency
+
+  // 3. Fetch all payments in that range
+  const { data: allRangePayments } = await supabase
+    .from("paiements")
+    .select("montant, date_paiement")
+    .gte("date_paiement", rangeStart)
+    .order("date_paiement", { ascending: true });
+
+  // 4. Generate the 6 month slots ending with the current month
+  const chartData = [];
+  const monthlyBuckets: Record<string, number> = {};
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(currentYear, currentMonth - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString("en-US", { month: "short" });
+    
+    chartData.push({ month: label, amount: 0, key });
+    monthlyBuckets[key] = 0;
+  }
+
+  // 5. Fill buckets using local date parsing to match the generated keys
+  (allRangePayments || []).forEach(p => {
+    if (!p.date_paiement) return;
+    const pDate = new Date(p.date_paiement);
+    // Important: use getMonth/getFullYear to stay in local context
+    const pKey = `${pDate.getFullYear()}-${String(pDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    if (monthlyBuckets[pKey] !== undefined) {
+      monthlyBuckets[pKey] += Number(p.montant);
+    }
+  });
+
+  // 6. Finalize chartData
+  chartData.forEach(item => {
+    item.amount = monthlyBuckets[item.key as string] || 0;
+    delete item.key;
+  });
+
+  const recentPayments = (recentRaw.data || []).map(p => ({
+    id: p.id,
+    joueur_nom: p.joueurs ? `${p.joueurs.prenom} ${p.joueurs.nom}` : "Unknown Player",
+    montant: Number(p.montant),
+    type: p.type_frais,
+    methode: p.methode_paiement,
+    date: p.date_paiement
+  }));
+
+  return {
+    totalRevenueMonth,
+    registrationRevenueMonth,
+    monthlyRevenueMonth,
+    revenueTrendPct: computeTrend(totalRevenueMonth, prevRevenueMonth),
+    chartData,
+    recentPayments
+  };
+}
+export async function getReportsData() {
+  const supabase = createSupabaseServiceClient();
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // 1. Get all players with their category
+  const { data: players, error: playersError } = await supabase
+    .from("joueurs")
+    .select(`
+      id,
+      prenom,
+      nom,
+      dossard,
+      sexe,
+      poste,
+      niveau,
+      is_active,
+      categorie:categorie_id ( nom )
+    `)
+    .order("nom", { ascending: true });
+
+  if (playersError) throw new Error(playersError.message);
+
+  // 2. Get all payments
+  const { data: payments, error: paymentsError } = await supabase
+    .from("paiements")
+    .select("*")
+    .order("date_paiement", { ascending: false });
+
+  if (paymentsError) throw new Error(paymentsError.message);
+
+  // 3. Process data for the report
+  const reportRows = (players || []).map(player => {
+    const playerPayments = (payments || []).filter(p => p.joueur_id === player.id);
+    const totalPaid = playerPayments.reduce((acc, p) => acc + Number(p.montant), 0);
+    const lastPayment = playerPayments[0]?.date_paiement || "No payment";
+    
+    // Check if paid for current month (monthly fee of $50)
+    const paidThisMonth = playerPayments.some(p => 
+      p.type_frais === "monthly" && 
+      new Date(p.date_paiement) >= new Date(currentMonthStart)
+    );
+    
+    return {
+      id: player.id,
+      name: `${player.prenom} ${player.nom}`,
+      category: (player.categorie as any)?.nom || "N/A",
+      dossard: player.dossard,
+      totalPaid,
+      lastPayment,
+      monthlyFee: 50,
+      paidThisMonth,
+      paymentCount: playerPayments.length,
+      payments: playerPayments
+    };
+  });
+
+  return {
+    reportRows,
+    totalRevenue: (payments || []).reduce((acc, p) => acc + Number(p.montant), 0),
+    paymentCount: (payments || []).length
+  };
+}

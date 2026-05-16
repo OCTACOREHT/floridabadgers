@@ -11,6 +11,8 @@ const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
 export type AuthenticatedUser = {
   id: string;
   email: string | null;
+  role?: string;
+  full_name?: string;
 };
 
 let authClient: ReturnType<typeof createClient> | null = null;
@@ -93,6 +95,8 @@ export async function getUserFromAccessToken(accessToken: string): Promise<Authe
   return {
     id: data.user.id,
     email: data.user.email ?? null,
+    role: data.user.user_metadata?.role as string | undefined,
+    full_name: data.user.user_metadata?.full_name as string | undefined,
   };
 }
 

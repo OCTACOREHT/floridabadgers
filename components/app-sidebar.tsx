@@ -17,6 +17,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
+  ZapIcon,
   LayoutDashboardIcon,
   ClipboardListIcon,
   ChartSplineIcon,
@@ -27,15 +28,21 @@ import {
   LayoutPanelTopIcon,
   MailIcon,
   XCircleIcon,
+  BanknoteIcon,
+  CreditCardIcon,
+  FileBarChartIcon,
 } from "lucide-react"
 
+import { AuthenticatedUser } from "@/lib/auth/session"
+
 const data = {
-  user: {
-    name: "Florida Badgers",
-    email: "floridabadgersfc@gmail.com",
-    avatar: "/images/Florida Badgers.png",
-  },
+  // ... (keep static data as is or remove user from it)
   navMain: [
+    {
+      title: "Quick Payment",
+      url: "/dashboard/payments/quick",
+      icon: <ZapIcon className="text-amber-500" />,
+    },
     {
       title: "Dashboard",
       url: "/dashboard",
@@ -77,6 +84,26 @@ const data = {
       icon: <LayoutPanelTopIcon />,
     },
     {
+      title: "Finance",
+      url: "/dashboard/finance",
+      icon: <BanknoteIcon />,
+    },
+    {
+      title: "Reports",
+      url: "/dashboard/reports",
+      icon: <FileBarChartIcon />,
+    },
+    {
+      title: "Payments",
+      url: "/dashboard/tables/paiements",
+      icon: <CreditCardIcon />,
+    },
+    {
+      title: "Payment Tracking",
+      url: "/dashboard/payments/tracking",
+      icon: <ClipboardListIcon className="text-emerald-500" />,
+    },
+    {
       title: "Not Players",
       url: "/dashboard/not-players",
       icon: <XCircleIcon />,
@@ -85,13 +112,31 @@ const data = {
   navSecondary: [
     {
       title: "Settings",
-      url: "/dashboard/tables",
+      url: "/dashboard/admin",
       icon: <Settings2Icon />,
     },
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user: AuthenticatedUser
+}
+
+export function AppSidebar({ user, ...props }: AppSidebarProps) {
+  // Filter nav items based on role
+  const isFinance = user.role === "finance"
+  const filteredNavMain = isFinance
+    ? data.navMain.filter((item) => 
+        ["Quick Payment", "Dashboard", "Finance", "Payments", "Reports", "Payment Tracking"].includes(item.title)
+      )
+    : data.navMain
+
+  const sidebarUser = {
+    name: user.full_name || user.email?.split("@")[0] || "User",
+    email: user.email || "",
+    avatar: "", // Handled by initials in NavUser
+  }
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -115,12 +160,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavAdmin />
+        <NavMain items={filteredNavMain} />
+        {user.role === "admin" && <NavAdmin />}
         <NavSecondary items={data.navSecondary} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={sidebarUser} />
       </SidebarFooter>
     </Sidebar>
   )

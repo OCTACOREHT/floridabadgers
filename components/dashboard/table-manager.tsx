@@ -45,14 +45,15 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
-  TableRow,
 } from "@/components/ui/table";
+
+import { AuthenticatedUser } from "@/lib/auth/session";
 
 type Props = {
   config: DashboardTableConfig;
   initialRows: Record<string, unknown>[];
+  currentUser?: AuthenticatedUser;
 };
 
 type PanelMode = "create" | "view" | "edit";
@@ -72,6 +73,9 @@ function formatValue(value: unknown): string {
   if (value === "en_attente") return "Pending";
   if (value === "accepte") return "Accepted";
   if (value === "refuse") return "Not Accepted";
+  if (value === "paid") return "Paid";
+  if (value === "pending") return "Pending";
+  if (value === "cancelled") return "Cancelled";
 
   // Auto-format ISO dates
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
@@ -88,6 +92,42 @@ function formatColumnLabel(value: string): string {
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
+}
+
+function getPaymentPlayerName(row: Record<string, unknown>): string | null {
+  const relatedPlayer = row.joueurs;
+  if (!relatedPlayer || typeof relatedPlayer !== "object" || Array.isArray(relatedPlayer)) {
+    return null;
+  }
+
+  const prenom = typeof (relatedPlayer as { prenom?: unknown }).prenom === "string"
+    ? (relatedPlayer as { prenom: string }).prenom.trim()
+    : "";
+  const nom = typeof (relatedPlayer as { nom?: unknown }).nom === "string"
+    ? (relatedPlayer as { nom: string }).nom.trim()
+    : "";
+
+  const fullName = `${prenom} ${nom}`.trim();
+  return fullName || null;
+}
+
+function formatPaymentFeeType(value: unknown): string {
+  const raw = String(value ?? "").toLowerCase();
+  if (raw === "registration") return "Registration Fee";
+  if (raw === "monthly") return "Monthly Fee";
+  if (raw === "equipment") return "Equipment";
+  if (raw === "other") return "Other";
+  return formatValue(value);
+}
+
+function formatPaymentMethod(value: unknown): string {
+  const raw = String(value ?? "").toLowerCase();
+  if (raw === "zelle") return "Zelle";
+  if (raw === "card") return "Card";
+  if (raw === "cash") return "Cash";
+  if (raw === "check") return "Check";
+  if (raw === "transfer") return "Bank Transfer";
+  return formatValue(value);
 }
 
 function isValidEmailAddress(value: string): boolean {
@@ -634,7 +674,9 @@ function buildFormFromRow(
   return Object.fromEntries(mappedEntries);
 }
 
-export function DashboardTableManager({ config, initialRows }: Props) {
+export function DashboardTableManager({ config, initialRows, currentUser }: Props) {
+  const isAdmin = currentUser?.role === "admin";
+  const canAdd = config.table !== "users" || isAdmin;
   const [rows, setRows] = useState<Record<string, unknown>[]>(initialRows);
   const [searchTerm, setSearchTerm] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -643,6 +685,21 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const [statusUpdateInFlightId, setStatusUpdateInFlightId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleteInFlightId, setDeleteInFlightId] = useState<string | null>(null);
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const id = searchParams.get("id");
+    const mode = searchParams.get("mode") as PanelMode | null;
+    
+    if (id && rows.length > 0) {
+      const row = rows.find(r => r.id === id || r.user_id === id);
+      if (row) {
+        if (mode === "edit") openEditPanel(row);
+        else openViewPanel(row);
+      }
+    }
+  }, [searchParams, rows.length]);
   const [pendingPanelSubmit, setPendingPanelSubmit] = useState(false);
   const [showOnlyNewMessages, setShowOnlyNewMessages] = useState(false);
 
@@ -667,11 +724,31 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const isPlayersTable = config.table === "joueurs";
   const isArticlesTable = config.table === "actualites";
   const isContactMessagesTable = config.table === "contact_messages";
+  const isPaymentsTable = config.table === "paiements";
   const isRegistrationTable =
     config.table === "inscriptions_joueurs" || config.table === "inscriptions_stage";
+  const paymentPlayerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!isPaymentsTable) return map;
+
+    for (const row of rows) {
+      const playerId = typeof row.joueur_id === "string" ? row.joueur_id : "";
+      const playerName = getPaymentPlayerName(row);
+      if (playerId && playerName && !map.has(playerId)) {
+        map.set(playerId, playerName);
+      }
+    }
+
+    return map;
+  }, [isPaymentsTable, rows]);
   const visibleFields = useMemo(
-    () => config.createFields.filter((field) => !(isPlayersTable && field.key === "bio")),
-    [config.createFields, isPlayersTable]
+    () =>
+      config.createFields.filter((field) => {
+        if (isPlayersTable && field.key === "bio") return false;
+        if (panelMode === "view" && (field.transient || field.sensitive)) return false;
+        return true;
+      }),
+    [config.createFields, isPlayersTable, panelMode]
   );
   const fieldByKey = useMemo(() => new Map(visibleFields.map((field) => [field.key, field])), [visibleFields]);
   const articlePhotoField = isArticlesTable ? fieldByKey.get("photo_url") ?? null : null;
@@ -682,13 +759,13 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const playerTopRightFieldKeys = ["nom", "prenom", "date_naissance", "age", "sexe", "categorie_id"];
   const playerTopRightFields = isPlayersTable
     ? playerTopRightFieldKeys
-        .map((key) => fieldByKey.get(key))
-        .filter((field): field is DashboardTableField => Boolean(field))
+      .map((key) => fieldByKey.get(key))
+      .filter((field): field is DashboardTableField => Boolean(field))
     : [];
   const playerBottomFields = isPlayersTable
     ? visibleFields.filter(
-        (field) => field.key !== "photo_url" && !playerTopRightFieldKeys.includes(field.key)
-      )
+      (field) => field.key !== "photo_url" && !playerTopRightFieldKeys.includes(field.key)
+    )
     : [];
   const fieldLabelByKey = useMemo(
     () => Object.fromEntries(visibleFields.map((field) => [field.key, field.label])),
@@ -1056,13 +1133,13 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     const success =
       pendingStatusChange.kind === "registration"
         ? await updateRowStatus(
-            pendingStatusChange.rowId,
-            pendingStatusChange.nextStatus as RegistrationStatusValue
-          )
+          pendingStatusChange.rowId,
+          pendingStatusChange.nextStatus as RegistrationStatusValue
+        )
         : await updateContactMessageStatus(
-            pendingStatusChange.rowId,
-            pendingStatusChange.nextStatus as ContactMessageStatusValue
-          );
+          pendingStatusChange.rowId,
+          pendingStatusChange.nextStatus as ContactMessageStatusValue
+        );
     if (success) {
       setPendingStatusChange(null);
     }
@@ -1131,7 +1208,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
     doc.text("FLORIDA BADGERS", 48, 20);
-    
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(60, 60, 60);
@@ -1161,11 +1238,11 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
-    
+
     const infoX = margin + 35;
     doc.setFont("helvetica", "bold");
     doc.text(`REGISTRATION ID: ${getRegistrationIdFallback(row)}`, infoX, currentY + 5);
-    
+
     doc.setFont("helvetica", "normal");
     doc.text(`Name: ${formatValue(row.nom_complet)}`, infoX, currentY + 12);
     doc.text(`Program: ${formatValue(row.programme_inscription)}`, infoX, currentY + 19);
@@ -1242,7 +1319,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
 
     // 4. Full Waiver Text
     if (currentY > 200) { doc.addPage(); currentY = 20; }
-    
+
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
@@ -1273,16 +1350,16 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
     doc.text("ATTESTATION & SIGNATURE", margin, sigY);
-    
+
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
     doc.rect(margin, sigY + 2, contentWidth, 35);
 
     const isMinor = Number(row.age) < 18;
-    const sigName = isMinor 
+    const sigName = isMinor
       ? (row.signature_parent_nom as string || row.nom_parent_tuteur as string || "N/A")
       : (row.signature_nom as string || row.nom_complet as string || "N/A");
-    
+
     const rawDate = isMinor ? row.signature_parent_date : row.signature_date;
     const sigDate = formatDashboardDate(rawDate || row.created_at);
 
@@ -1291,14 +1368,14 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
     doc.text(sigName, margin + 10, sigY + 18);
-    
+
     // Label and Date
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     doc.text("________________________________________", margin + 10, sigY + 20);
     doc.text(isMinor ? "Parent / Guardian Signature" : "Participant Signature", margin + 10, sigY + 26);
-    
+
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
     doc.text(sigDate, pageWidth - margin - 10, sigY + 18, { align: "right" });
@@ -1312,6 +1389,228 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     doc.text("This document was electronically signed. The signature above is a legally binding electronic representation of the name typed by the user.", pageWidth / 2, sigY + 34, { align: "center" });
 
     doc.save(`Registration_${row.nom_complet || "Record"}.pdf`);
+  };
+
+  const generatePaymentReceiptPDF = async (row: Record<string, unknown>) => {
+    const doc = new jsPDF();
+    const tableDoc = doc as PdfWithAutoTable;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
+    const dark = [20, 20, 20] as const;
+    const accent = [74, 74, 74] as const;
+    const muted = [105, 105, 105] as const;
+    const border = [217, 217, 217] as const;
+
+    const formatCurrency = (value: number): string =>
+      `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const drawSectionTitle = (title: string, y: number) => {
+      doc.setFillColor(accent[0], accent[1], accent[2]);
+      doc.rect(margin, y - 4.2, contentWidth, 7, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text(title, margin + 3, y + 0.8);
+    };
+
+    const loadImageBase64 = (url: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = url;
+      });
+    };
+
+    const paymentId = String(row.id ?? "");
+    const receiptId = `FBCA-RCPT-${paymentId.slice(0, 8).toUpperCase()}`;
+    const playerName = getPaymentPlayerName(row) ?? formatValue(row.registration_player_name) ?? "Unknown Player";
+    const parentName = formatValue(row.parent_name);
+    const parentPhone = formatValue(row.parent_phone);
+    const registrationEmail = formatValue(row.registration_email);
+    const registrationPhone = formatValue(row.registration_phone);
+    const amount = Number(row.montant ?? 0);
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    const paymentDate = formatDashboardDate(row.date_paiement);
+    const statusLabel = formatValue(row.statut);
+    const paymentMethod = formatPaymentMethod(row.methode_paiement);
+    const feeType = formatPaymentFeeType(row.type_frais);
+    const notes = formatValue(row.notes);
+    const generatedAt = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date());
+
+    // Header block (final style)
+
+    try {
+      const logoBase64 = await loadImageBase64("/images/Florida Badgers.png");
+      doc.addImage(logoBase64, "PNG", margin, 10, 24, 24);
+    } catch (e) {
+      console.warn("Logo failed to load", e);
+    }
+
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(17);
+    doc.text("FLORIDA BADGERS FCA", 44, 18.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.6);
+    doc.setTextColor(muted[0], muted[1], muted[2]);
+    doc.text("1901 N. Seacrest Blvd, Boynton Beach FL 33435", 44, 25.2);
+    doc.text("info@floridabadgersfca.com | +1 914-426-1526", 44, 30);
+
+    doc.setDrawColor(border[0], border[1], border[2]);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 37, pageWidth - margin, 37);
+
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("OFFICIAL PAYMENT RECEIPT", pageWidth / 2, 48, { align: "center" });
+
+    const rightInfoX = pageWidth - margin;
+    const metaRows: Array<{ label: string; value: string }> = [
+      { label: "RECEIPT #", value: receiptId },
+      { label: "PAYMENT ID", value: paymentId || "-" },
+      { label: "GENERATED AT", value: generatedAt },
+    ];
+    const drawRightMetaLine = (y: number, label: string, value: string) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.8);
+      doc.setTextColor(35, 35, 35);
+      const labelText = `${label}: `;
+      const labelWidth = doc.getTextWidth(labelText);
+      doc.setFont("helvetica", "normal");
+      const valueWidth = doc.getTextWidth(value);
+      const totalWidth = labelWidth + valueWidth;
+      const startX = rightInfoX - totalWidth;
+      doc.setFont("helvetica", "bold");
+      doc.text(labelText, startX, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(value, startX + labelWidth, y);
+    };
+
+    const metaStartY = 54;
+    const metaLineHeight = 6;
+    metaRows.forEach((rowMeta, index) => {
+      drawRightMetaLine(metaStartY + index * metaLineHeight, rowMeta.label, rowMeta.value);
+    });
+
+    let currentY = 74;
+
+    drawSectionTitle("PLAYER DETAILS", currentY);
+    currentY += 8;
+
+    const drawPlainDetail = (label: string, value: string, y: number) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.6);
+      doc.setTextColor(36, 36, 36);
+      doc.text(`${label}:`, margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.text(value || "-", margin + 48, y);
+    };
+
+    drawPlainDetail("Player Name", playerName, currentY + 1.5);
+    drawPlainDetail("Parent / Guardian", parentName, currentY + 9.5);
+    drawPlainDetail("Parent Phone", parentPhone, currentY + 17.5);
+    drawPlainDetail("Registration Email", registrationEmail, currentY + 25.5);
+    drawPlainDetail("Registration Phone", registrationPhone, currentY + 33.5);
+    currentY += 43;
+
+    if (currentY > 208) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    drawSectionTitle("PAYMENT DETAILS", currentY);
+    currentY += 5;
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Description", "Method", "Status", "Date", "Amount"]],
+      body: [[feeType, paymentMethod, statusLabel, paymentDate, formatCurrency(safeAmount)]],
+      theme: "grid",
+      styles: { fontSize: 8.8, cellPadding: 2.5, textColor: [20, 20, 20] },
+      headStyles: {
+        fillColor: [245, 245, 245],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 52 },
+        4: { halign: "right", fontStyle: "bold" },
+      },
+      tableLineColor: [border[0], border[1], border[2]],
+      tableLineWidth: 0.1,
+      margin: { left: margin, right: margin },
+    });
+    currentY = (tableDoc.lastAutoTable?.finalY ?? currentY) + 5;
+
+    autoTable(doc, {
+      startY: currentY,
+      theme: "grid",
+      body: [
+        ["Subtotal", formatCurrency(safeAmount)],
+        ["Taxes", "$0.00"],
+        ["Total Paid", formatCurrency(safeAmount)],
+      ],
+      styles: { fontSize: 8.8, cellPadding: 2.4, textColor: [20, 20, 20] },
+      columnStyles: {
+        0: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 34 },
+        1: { halign: "right", fontStyle: "bold", cellWidth: 30 },
+      },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.row.index === 2) {
+          data.cell.styles.fillColor = [217, 217, 217];
+          data.cell.styles.textColor = [0, 0, 0];
+        }
+      },
+      tableLineColor: [border[0], border[1], border[2]],
+      tableLineWidth: 0.1,
+      margin: { left: pageWidth - margin - 64 },
+      tableWidth: 64,
+    });
+
+    currentY = Math.max((tableDoc.lastAutoTable?.finalY ?? currentY) + 8, currentY + 8);
+    if (notes !== "-") {
+      drawSectionTitle("NOTES", currentY);
+      currentY += 5;
+      autoTable(doc, {
+        startY: currentY,
+        body: [[notes]],
+        theme: "grid",
+        styles: { fontSize: 8.6, cellPadding: 3, textColor: [31, 41, 55] },
+        tableLineColor: [border[0], border[1], border[2]],
+        tableLineWidth: 0.1,
+        margin: { left: margin, right: margin },
+      });
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.7);
+    doc.setTextColor(muted[0], muted[1], muted[2]);
+    doc.text(
+      "Thank you for supporting Florida Badgers FCA. This receipt confirms that payment has been recorded in our system.",
+      pageWidth / 2,
+      286,
+      { align: "center" }
+    );
+
+    const safePlayerName = playerName.replace(/[^\w\s-]/g, "").replace(/\s+/g, "_");
+    doc.save(`Payment_Receipt_${safePlayerName || "Player"}_${receiptId}.pdf`);
   };
 
   const runPanelSubmit = async (): Promise<boolean> => {
@@ -1370,6 +1669,36 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const handlePanelSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (panelMode === "view") return;
+
+    // Validation client générique pour les champs obligatoires
+    for (const field of config.createFields) {
+      if (field.required && !panelValues[field.key]) {
+        setPanelError(`Le champ "${field.label}" est obligatoire.`);
+        panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+    }
+
+    // Validation spécifique pour les mots de passe (table users)
+    if (config.table === "users") {
+      const password = String(panelValues.password || "").trim();
+      const confirmPassword = String(panelValues.confirm_password || "").trim();
+
+      if (panelMode === "create" || (panelMode === "edit" && password)) {
+        if (!password && panelMode === "create") {
+          setPanelError("Le mot de passe est obligatoire.");
+          panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        if (password !== confirmPassword) {
+          setPanelError("Les mots de passe ne correspondent pas.");
+          panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+      }
+    }
+
+    setPanelError(null);
     setPendingPanelSubmit(true);
   };
 
@@ -1384,8 +1713,8 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     panelMode === "create"
       ? `Create ${config.label}`
       : panelMode === "edit"
-      ? `Edit ${config.label}`
-      : `View ${config.label}`;
+        ? `Edit ${config.label}`
+        : `View ${config.label}`;
   const panelReadonly = panelMode === "view";
 
   const handlePanelOpenChange = (nextOpen: boolean) => {
@@ -1695,6 +2024,26 @@ export function DashboardTableManager({ config, initialRows }: Props) {
       );
     }
 
+    if (isPaymentsTable && field.key === "joueur_id") {
+      const playerId = String(value ?? "");
+      const playerName = paymentPlayerNameById.get(playerId) ?? playerId;
+
+      if (panelMode === "edit" || panelReadonly) {
+        return (
+          <div className="space-y-2">
+            <Input
+              id={`${id}-player-name`}
+              value={playerName}
+              disabled
+            />
+            <p className="text-xs text-muted-foreground">
+              Player name is shown for this payment record.
+            </p>
+          </div>
+        );
+      }
+    }
+
     return (
       <Input
         id={id}
@@ -1702,12 +2051,14 @@ export function DashboardTableManager({ config, initialRows }: Props) {
           field.type === "number"
             ? "number"
             : field.type === "email"
-            ? "email"
-            : field.type === "date"
-            ? "date"
-            : field.type === "datetime"
-            ? "datetime-local"
-            : "text"
+              ? "email"
+              : field.type === "date"
+                ? "date"
+                : field.type === "datetime"
+                  ? "datetime-local"
+                  : field.type === "password"
+                    ? "password"
+                    : "text"
         }
         value={String(value ?? "")}
         placeholder={field.placeholder}
@@ -1738,22 +2089,47 @@ export function DashboardTableManager({ config, initialRows }: Props) {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <Card
+        className={cn(
+          isPaymentsTable ? "border-border/70 bg-card shadow-sm" : "border-[#D9D9D9] shadow-md overflow-hidden"
+        )}
+      >
+        <CardHeader
+          className={cn(
+            isPaymentsTable ? "py-6" : "bg-zinc-50 border-b border-zinc-100 py-6"
+          )}
+        >
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative w-full max-w-xl">
-              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <SearchIcon
+                className={cn(
+                  "pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2",
+                  isPaymentsTable ? "text-muted-foreground" : "text-zinc-400"
+                )}
+              />
               <Input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder={`Search ${config.label.toLowerCase()}...`}
                 aria-label={`Search ${config.label}`}
-                className="h-10 pl-9"
+                className={cn(
+                  isPaymentsTable
+                    ? "h-10 pl-9"
+                    : "h-11 pl-10 border-zinc-200 focus:border-[#050505] transition-all rounded-xl shadow-none bg-white"
+                )}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="hidden text-sm text-muted-foreground md:block">
-                {filteredRows.length} of {rows.length} rows
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                className={cn(
+                  isPaymentsTable
+                    ? "hidden text-sm text-muted-foreground md:block"
+                    : "hidden text-[10px] font-black uppercase text-zinc-400 tracking-widest lg:block"
+                )}
+              >
+                {isPaymentsTable
+                  ? `${filteredRows.length} of ${rows.length} rows`
+                  : `${filteredRows.length} / ${rows.length} records`}
               </div>
               {isContactMessagesTable ? (
                 <Button
@@ -1762,9 +2138,9 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                   variant={showOnlyNewMessages ? "default" : "outline"}
                   onClick={() => setShowOnlyNewMessages((prev) => !prev)}
                   className={cn(
-                    "h-9 gap-2",
+                    "h-9 gap-2 rounded-lg font-bold text-xs transition-all",
                     showOnlyNewMessages
-                      ? "bg-black text-white hover:bg-zinc-800"
+                      ? "bg-[#050505] text-white hover:bg-zinc-800"
                       : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100"
                   )}
                 >
@@ -1775,22 +2151,42 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                     )}
                   />
                   New Messages
-                  <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold">
+                  <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-black">
                     {newMessagesCount}
                   </span>
                 </Button>
               ) : null}
-              <Button type="button" variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-                <RefreshCwIcon className="mr-1 size-4" />
-                {isRefreshing ? "Refreshing..." : "Refresh"}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className={cn(
+                  isPaymentsTable ? "" : "h-9 rounded-lg border-zinc-300 font-bold text-xs uppercase tracking-tight"
+                )}
+              >
+                <RefreshCwIcon className={cn("mr-1.5 size-3.5", isRefreshing && "animate-spin")} />
+                {isRefreshing ? (isPaymentsTable ? "Refreshing..." : "...") : "Refresh"}
               </Button>
-              <Button type="button" size="sm" onClick={openCreatePanel}>
-                <PlusIcon className="mr-1 size-4" />
-                Create
-              </Button>
+              {canAdd && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={openCreatePanel}
+                  className={cn(
+                    isPaymentsTable
+                      ? ""
+                      : "h-9 rounded-lg bg-[#050505] text-white font-black text-xs uppercase tracking-widest shadow-sm hover:bg-zinc-800"
+                  )}
+                >
+                  <PlusIcon className="mr-1.5 size-3.5" />
+                  {isPaymentsTable ? "Create" : "New Entry"}
+                </Button>
+              )}
             </div>
           </div>
-          {tableError ? <p className="text-sm text-red-600">{tableError}</p> : null}
+          {tableError ? <p className="mt-2 text-xs font-bold text-rose-600">{tableError}</p> : null}
         </CardHeader>
         <CardContent>
           {isArticlesTable ? (
@@ -1812,8 +2208,8 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                     typeof row.sous_titre === "string" && row.sous_titre.trim()
                       ? row.sous_titre.trim()
                       : descriptionPreview
-                      ? descriptionPreview
-                      : "Aucune description.";
+                        ? descriptionPreview
+                        : "Aucune description.";
                   const photoSource = getPhotoPreviewSource(row.photo_url) ?? ARTICLE_FALLBACK_IMAGE;
                   const clicksCount = getPositiveCount(row.clicks_count);
                   const isPublished = row.is_published === true;
@@ -1882,37 +2278,74 @@ export function DashboardTableManager({ config, initialRows }: Props) {
               </div>
             )
           ) : (
-            <Table>
+            <Table className={cn(isPaymentsTable ? "" : "border-collapse")}>
               <TableHeader>
-                <TableRow>
+                <tr className={cn(isPaymentsTable ? "border-b bg-muted/50" : "border-b bg-zinc-50/50")}>
                   {listColumns.map((column) => (
-                    <TableHead key={column}>
+                    <th
+                      key={column}
+                      className={cn(
+                        "px-4 py-4 text-left",
+                        isPaymentsTable
+                          ? "font-medium text-muted-foreground"
+                          : "font-black uppercase text-[10px] text-zinc-500 tracking-widest"
+                      )}
+                    >
                       {fieldLabelByKey[column] ?? formatColumnLabel(column)}
-                    </TableHead>
+                    </th>
                   ))}
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
+                  <th
+                    className={cn(
+                      "px-4 py-4 text-right",
+                      isPaymentsTable
+                        ? "font-medium text-muted-foreground"
+                        : "font-black uppercase text-[10px] text-zinc-500 tracking-widest"
+                    )}
+                  >
+                    Actions
+                  </th>
+                </tr>
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={listColumns.length + 1} className="py-8 text-center text-muted-foreground">
-                      No rows found.
+                  <tr className={cn(isPaymentsTable ? "" : "border-b bg-zinc-50/50")}>
+                    <TableCell
+                      colSpan={listColumns.length + 1}
+                      className={cn(
+                        "py-8 text-center",
+                        isPaymentsTable ? "text-muted-foreground" : "text-zinc-400 italic font-medium"
+                      )}
+                    >
+                      {isPaymentsTable ? "No rows found." : "No records found in this table."}
                     </TableCell>
-                  </TableRow>
+                  </tr>
                 ) : filteredRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={listColumns.length + 1} className="py-8 text-center text-muted-foreground">
-                      No matching rows found.
+                  <tr className={cn(isPaymentsTable ? "" : "border-b bg-zinc-50/50")}>
+                    <TableCell
+                      colSpan={listColumns.length + 1}
+                      className={cn(
+                        "py-8 text-center",
+                        isPaymentsTable ? "text-muted-foreground" : "text-zinc-400 italic font-medium"
+                      )}
+                    >
+                      {isPaymentsTable
+                        ? `No matching rows found.`
+                        : `No matching records found for "${searchTerm}".`}
                     </TableCell>
-                  </TableRow>
+                  </tr>
                 ) : (
                   filteredRows.map((row) => {
                     const id = String(row.id ?? "");
                     const rowStatus = normalizeRegistrationStatus(row.statut);
                     const isStatusUpdating = statusUpdateInFlightId === id;
                     return (
-                      <TableRow key={id}>
+                      <tr
+                        key={id}
+                        className={cn(
+                          "transition-colors group border-b",
+                          isPaymentsTable ? "hover:bg-muted/30" : "hover:bg-zinc-50/50 border-zinc-100"
+                        )}
+                      >
                         {listColumns.map((column) => (
                           <TableCell
                             key={`${id}-${column}`}
@@ -1977,6 +2410,8 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                                   <option value="closed">Closed</option>
                                 </select>
                               </div>
+                            ) : config.table === "paiements" && column === "joueur_id" ? (
+                              getPaymentPlayerName(row) ?? formatValue(row[column])
                             ) : column === "registration_id" && !row[column] ? (
                               getRegistrationIdFallback(row)
                             ) : column === "categorie_age" && !row[column] ? (
@@ -1999,6 +2434,17 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                                 <DownloadIcon className="size-4" />
                               </Button>
                             )}
+                            {config.table === "paiements" && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                title="Download Receipt PDF"
+                                onClick={() => generatePaymentReceiptPDF(row)}
+                              >
+                                <DownloadIcon className="size-4" />
+                              </Button>
+                            )}
                             {isContactMessagesTable && (
                               <Button type="button" size="sm" variant="ghost" onClick={() => openReplyDraft(row)}>
                                 <MailIcon className="mr-1 size-4" />
@@ -2015,13 +2461,15 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                                 Edit
                               </Button>
                             ) : null}
-                            <Button type="button" size="sm" variant="ghost" onClick={() => requestDelete(id)}>
-                              <Trash2Icon className="mr-1 size-4" />
-                              Delete
-                            </Button>
+                            {(config.table !== "users" || isAdmin) && (
+                              <Button type="button" size="sm" variant="ghost" onClick={() => requestDelete(id)}>
+                                <Trash2Icon className="mr-1 size-4" />
+                                Delete
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
-                      </TableRow>
+                      </tr>
                     );
                   })
                 )}
@@ -2152,6 +2600,50 @@ export function DashboardTableManager({ config, initialRows }: Props) {
               </div>
             </SheetFooter>
           </form>
+          {pendingPanelSubmit ? (
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                onClick={() => {
+                  if (isSaving) return;
+                  setPendingPanelSubmit(false);
+                }}
+              />
+              <div className="relative z-[1001] w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+                <h3 className="text-base font-semibold text-zinc-900">Confirm Changes</h3>
+                <p className="mt-2 text-sm text-zinc-700">
+                  {panelMode === "create"
+                    ? "Etes-vous sûr de vouloir créer cet utilisateur ?"
+                    : "Etes-vous sûr de vouloir enregistrer ces modifications ?"}
+                </p>
+
+                {panelError ? (
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p className="text-xs font-semibold text-red-800">Error</p>
+                    <p className="mt-1 text-xs text-red-700">{panelError}</p>
+                  </div>
+                ) : null}
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={confirmPanelSubmit}
+                    disabled={isSaving}
+                    className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSaving ? "Saving..." : "Yes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingPanelSubmit(false)}
+                    disabled={isSaving}
+                    className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </SheetContent>
       </Sheet>
 
@@ -2171,11 +2663,11 @@ export function DashboardTableManager({ config, initialRows }: Props) {
               <span className="font-semibold">
                 {pendingStatusChange.kind === "registration"
                   ? getRegistrationStatusLabel(
-                      pendingStatusChange.nextStatus as RegistrationStatusValue
-                    )
+                    pendingStatusChange.nextStatus as RegistrationStatusValue
+                  )
                   : getContactMessageStatusLabel(
-                      pendingStatusChange.nextStatus as ContactMessageStatusValue
-                    )}
+                    pendingStatusChange.nextStatus as ContactMessageStatusValue
+                  )}
               </span>
               ?
             </p>
@@ -2228,44 +2720,6 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                 type="button"
                 onClick={() => setPendingDeleteId(null)}
                 disabled={deleteInFlightId === pendingDeleteId}
-                className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {pendingPanelSubmit ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/35 backdrop-blur-sm"
-            onClick={() => {
-              if (isSaving) return;
-              setPendingPanelSubmit(false);
-            }}
-          />
-          <div className="relative z-[121] w-full max-w-md rounded-2xl border border-zinc-300 bg-white p-5 shadow-2xl">
-            <h3 className="text-base font-semibold text-zinc-900">Confirm Changes</h3>
-            <p className="mt-2 text-sm text-zinc-700">
-              {panelMode === "create"
-                ? "Are you sure you want to create this item?"
-                : "Are you sure you want to save these changes?"}
-            </p>
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={confirmPanelSubmit}
-                disabled={isSaving}
-                className="rounded-md bg-black px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSaving ? "Saving..." : "Yes"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPendingPanelSubmit(false)}
-                disabled={isSaving}
                 className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 No

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getDashboardTableConfig, normalizeTablePayload } from "@/lib/dashboard/tables";
 import { requireApiUser, requireApiUserWithUser } from "@/lib/auth/api-guard";
@@ -102,30 +103,30 @@ function normalizeLoose(value: string): string {
     .trim();
 }
 
-function normalizeSex(value: string): "Masculin" | "Feminin" | null {
+function normalizeSex(value: string): "Masculin" | "Féminin" | "Feminin" | null {
   const normalized = stripAccents(value).toLowerCase().trim();
   if (!normalized) return null;
-  if (normalized.includes("fem")) return "Feminin";
+  if (normalized.includes("fem")) return "Féminin";
   if (normalized.includes("mas") || normalized === "male") return "Masculin";
   return null;
 }
 
-function normalizePoste(value: string): "Gardien" | "Defenseur" | "Milieu" | "Attaquant" | null {
+function normalizePoste(value: string): "Gardien" | "Défenseur" | "Defenseur" | "Milieu" | "Attaquant" | null {
   const normalized = stripAccents(value).toLowerCase().trim();
   if (!normalized) return null;
   if (normalized.includes("goal") || normalized.includes("gard")) return "Gardien";
-  if (normalized.includes("def")) return "Defenseur";
+  if (normalized.includes("def")) return "Défenseur";
   if (normalized.includes("mid") || normalized.includes("mil")) return "Milieu";
   if (normalized.includes("forw") || normalized.includes("att")) return "Attaquant";
   return null;
 }
 
-function normalizeNiveau(value: string): "Debutant" | "Intermediaire" | "Avance" | null {
+function normalizeNiveau(value: string): "Débutant" | "Debutant" | "Intermédiaire" | "Intermediaire" | "Avancé" | "Avance" | null {
   const normalized = normalizeLoose(value);
   if (!normalized) return null;
-  if (normalized.includes("beg") || normalized.includes("deb")) return "Debutant";
-  if (normalized.includes("int") || normalized.includes("inter")) return "Intermediaire";
-  if (normalized.includes("adv") || normalized.includes("ava")) return "Avance";
+  if (normalized.includes("beg") || normalized.includes("deb")) return "Débutant";
+  if (normalized.includes("int") || normalized.includes("inter")) return "Intermédiaire";
+  if (normalized.includes("adv") || normalized.includes("ava")) return "Avancé";
   return null;
 }
 
@@ -133,7 +134,7 @@ function getSexCandidates(value: string): string[] {
   const normalized = normalizeLoose(value);
   if (!normalized) return ["Masculin", "Male"];
   if (normalized.includes("fem")) {
-    return ["Feminin", "Féminin", "FÃ©minin", "Female"];
+    return ["Féminin", "Feminin", "FÃ©minin", "Female"];
   }
   return ["Masculin", "Male"];
 }
@@ -142,7 +143,7 @@ function getPosteCandidates(value: string): string[] {
   const normalized = normalizeLoose(value);
   if (!normalized) return ["Milieu", "Midfielder"];
   if (normalized.includes("goal") || normalized.includes("gard")) return ["Gardien", "Goalkeeper"];
-  if (normalized.includes("def")) return ["Defenseur", "Défenseur", "DÃ©fenseur", "Defender"];
+  if (normalized.includes("def")) return ["Défenseur", "Defenseur", "DÃ©fenseur", "Defender"];
   if (normalized.includes("mid") || normalized.includes("mil")) return ["Milieu", "Midfielder"];
   if (normalized.includes("forw") || normalized.includes("att")) return ["Attaquant", "Forward"];
   return [value, "Milieu", "Midfielder"];
@@ -150,17 +151,17 @@ function getPosteCandidates(value: string): string[] {
 
 function getNiveauCandidates(value: string): string[] {
   const normalized = normalizeLoose(value);
-  if (!normalized) return ["Intermediaire", "Intermédiaire", "IntermÃ©diaire", "Intermediate"];
+  if (!normalized) return ["Intermédiaire", "Intermediaire", "IntermÃ©diaire", "Intermediate"];
   if (normalized.includes("beg") || normalized.includes("deb")) {
-    return ["Debutant", "Débutant", "DÃ©butant", "Beginner"];
+    return ["Débutant", "Debutant", "DÃ©butant", "Beginner"];
   }
   if (normalized.includes("int") || normalized.includes("inter")) {
-    return ["Intermediaire", "Intermédiaire", "IntermÃ©diaire", "Intermediate"];
+    return ["Intermédiaire", "Intermediaire", "IntermÃ©diaire", "Intermediate"];
   }
   if (normalized.includes("adv") || normalized.includes("ava")) {
-    return ["Avance", "Avancé", "AvancÃ©", "Advanced"];
+    return ["Avancé", "Avance", "AvancÃ©", "Advanced"];
   }
-  return [value, "Intermediaire", "Intermédiaire", "Intermediate"];
+  return [value, "Intermédiaire", "Intermediaire", "Intermediate"];
 }
 
 function buildLegacyPlayerValueCandidates(registration: RegistrationRow): PlayerLegacyValueSet[] {
@@ -290,22 +291,6 @@ async function getNextJerseyNumber(supabase: ReturnType<typeof createSupabaseSer
   return Math.max(1, currentMax + 1);
 }
 
-async function updateExistingUserRoleIfPresent(
-  supabase: ReturnType<typeof createSupabaseServiceClient>,
-  email: string
-): Promise<void> {
-  if (!isEmail(email)) return;
-
-  const { error } = await supabase.from("users").update({ role: "player" }).eq("email", email);
-  if (error) {
-    const message = (error.message ?? "").toLowerCase();
-    if (error.code === "42P01" || message.includes("relation") || message.includes("does not exist")) {
-      return;
-    }
-    throw new Error(error.message);
-  }
-}
-
 async function linkRegistrationToPlayerIfPossible(
   supabase: ReturnType<typeof createSupabaseServiceClient>,
   table: RegistrationTableName,
@@ -385,7 +370,7 @@ async function promoteRegistrationToPlayer(
     sexe: normalizeSex(asText(registration.sexe)) ?? "Masculin",
     categorie_id: isUuid(asText(registration.categorie_id)) ? asText(registration.categorie_id) : null,
     poste: normalizePoste(asText(registration.poste_jeu)) ?? "Milieu",
-    niveau: normalizeNiveau(asText(registration.niveau_jeu)) ?? "Intermediaire",
+    niveau: normalizeNiveau(asText(registration.niveau_jeu)) ?? "Intermédiaire",
     dossard,
     is_active: true,
   };
@@ -443,11 +428,6 @@ async function promoteRegistrationToPlayer(
   }
 
   await linkRegistrationToPlayerIfPossible(supabase, table, registration.id, createdPlayer.id);
-
-  const registrationEmail = asText(registration.email);
-  if (registrationEmail) {
-    await updateExistingUserRoleIfPresent(supabase, registrationEmail);
-  }
 
   return {
     playerId: createdPlayer.id,
@@ -550,6 +530,23 @@ export async function PATCH(
     return NextResponse.json({ error: "Unsupported table." }, { status: 404 });
   }
 
+  const isAdmin = authenticatedUser?.role === "admin";
+  const isFinance = authenticatedUser?.role === "finance";
+  const allowedTablesForFinance = ["paiements", "users"];
+
+  if (isFinance && !allowedTablesForFinance.includes(table)) {
+    return NextResponse.json({ error: "Forbidden: You do not have permission to modify this table." }, { status: 403 });
+  }
+
+  if (!isAdmin && !isFinance) {
+    return NextResponse.json({ error: "Forbidden: Unauthorized role." }, { status: 403 });
+  }
+
+  // Security: Non-admins can only edit THEIR OWN user record
+  if (table === "users" && !isAdmin && authenticatedUser.id !== id) {
+    return NextResponse.json({ error: "Forbidden: You can only manage your own profile." }, { status: 403 });
+  }
+
   if (!isUuid(id)) {
     return NextResponse.json({ error: "Invalid row id." }, { status: 400 });
   }
@@ -601,6 +598,49 @@ export async function PATCH(
       }
     }
 
+    // Custom logic for users table (Supabase Auth integration)
+    if (table === "users") {
+      const email = body.email !== undefined ? String(body.email || "").trim().toLowerCase() : undefined;
+      const password = body.password !== undefined ? String(body.password || "").trim() : undefined;
+      const confirmPassword = body.confirm_password !== undefined ? String(body.confirm_password || "").trim() : undefined;
+
+      const supabase = createSupabaseServiceClient();
+      const updateData: any = {};
+
+      if (email !== undefined) updateData.email = email;
+      
+      if (password !== undefined) {
+        if (password) {
+          if (password !== confirmPassword) {
+            return NextResponse.json({ error: "Passwords do not match." }, { status: 400 });
+          }
+          updateData.password = password;
+        }
+      }
+
+      // Update Auth user if needed
+      if (Object.keys(updateData).length > 0) {
+        const { error: authError } = await supabase.auth.admin.updateUserById(id, {
+          ...updateData,
+          user_metadata: {
+            full_name: payload.full_name || undefined,
+            role: payload.role || undefined
+          }
+        });
+
+        if (authError) {
+          return NextResponse.json({ error: `Auth Update Error: ${authError.message}` }, { status: 400 });
+        }
+      }
+
+      // Remove transient fields
+      for (const field of config.createFields) {
+        if (field.transient) {
+          delete payload[field.key];
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from(config.table)
       .update(payload)
@@ -610,6 +650,11 @@ export async function PATCH(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // Don't return password in response
+    if (data && "password" in data) {
+      delete (data as any).password;
     }
 
     let responseData = data as Record<string, unknown>;
@@ -654,13 +699,31 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ table: string; id: string }> }
 ) {
-  const guardResponse = await requireApiUser(request);
-  if (guardResponse) return guardResponse;
+  const auth = await requireApiUserWithUser(request);
+  if (auth.response) return auth.response;
+  const user = auth.user;
 
   const { table, id } = await context.params;
   const config = getDashboardTableConfig(table);
   if (!config) {
     return NextResponse.json({ error: "Unsupported table." }, { status: 404 });
+  }
+
+  const isAdmin = user?.role === "admin";
+  const isFinance = user?.role === "finance";
+  const allowedTablesForFinance = ["paiements", "users"];
+
+  if (isFinance && !allowedTablesForFinance.includes(table)) {
+    return NextResponse.json({ error: "Forbidden: You do not have permission to delete from this table." }, { status: 403 });
+  }
+
+  if (!isAdmin && !isFinance) {
+    return NextResponse.json({ error: "Forbidden: Unauthorized role." }, { status: 403 });
+  }
+
+  // Security: Non-admins CANNOT delete users (even themselves via API for safety)
+  if (table === "users" && !isAdmin) {
+    return NextResponse.json({ error: "Forbidden: Only admins can delete users." }, { status: 403 });
   }
 
   if (!isUuid(id)) {
@@ -669,6 +732,16 @@ export async function DELETE(
 
   try {
     const supabase = createSupabaseServiceClient();
+
+    // If deleting from users table, also delete from Supabase Auth
+    if (table === "users") {
+      const { error: authError } = await supabase.auth.admin.deleteUser(id);
+      if (authError) {
+        console.error(`[delete-user] Failed to delete auth user ${id}:`, authError.message);
+        // We continue anyway to try and delete the DB record
+      }
+    }
+
     const { error } = await supabase.from(config.table).delete().eq("id", id);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

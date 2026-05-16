@@ -9,19 +9,15 @@ export const dynamic = "force-dynamic";
 const roles = [
   {
     title: "Admin",
-    description: "Full access to dashboard, content, and user management.",
+    description: "Full dashboard access and administration control.",
   },
   {
-    title: "Staff",
-    description: "Operational access for day-to-day club administration.",
+    title: "Finance",
+    description: "Finance operations access for registrations and payment workflows.",
   },
   {
-    title: "Coach",
-    description: "Access to player and team workflows only.",
-  },
-  {
-    title: "Player",
-    description: "Limited access for player records and registration status.",
+    title: "Media",
+    description: "Content and media workflow access.",
   },
 ] as const;
 
@@ -43,7 +39,7 @@ export default function AdminRolesPage() {
             </div>
             <CardTitle>Role assignments</CardTitle>
             <CardDescription>
-              The `users` table already stores a role field, so this screen is the control center for access planning.
+              The `users` table stores a role field with `admin`, `finance`, and `media` values.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">

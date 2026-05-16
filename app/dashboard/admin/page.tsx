@@ -1,44 +1,51 @@
 import Link from "next/link";
-import { ArrowRight, KeyRound, ShieldUser, UserPlus } from "lucide-react";
+import { ArrowRight, KeyRound, UserPlus, UserIcon } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-const adminActions = [
-  {
-    title: "Add User",
-    description: "Open the users table and add new club accounts or update user records.",
-    href: "/dashboard/tables/users",
-    icon: UserPlus,
-  },
-  {
-    title: "Roles",
-    description: "Review role assignments and keep club access levels consistent.",
-    href: "/dashboard/admin/roles",
-    icon: ShieldUser,
-  },
-  {
-    title: "Password Reset",
-    description: "Prepare password reset workflows for staff and administrators.",
-    href: "/dashboard/admin/password",
-    icon: KeyRound,
-  },
-] as const;
+export default async function AdminHomePage() {
+  const user = await getAuthenticatedUserFromServerCookies();
+  const isAdmin = user?.role === "admin";
 
-export default function AdminHomePage() {
+  const actions = [
+    {
+      title: "My Profile",
+      description: "View your personal information and manage your account credentials.",
+      href: `/dashboard/tables/users?id=${user?.id}&mode=view`,
+      icon: UserIcon,
+      visible: true,
+    },
+    {
+      title: "Password Reset",
+      description: "Securely reset your password to keep your account safe.",
+      href: "/dashboard/admin/password",
+      icon: KeyRound,
+      visible: true,
+    },
+    {
+      title: "User Management",
+      description: "Manage system users, add new accounts, and modify permissions.",
+      href: "/dashboard/tables/users",
+      icon: UserPlus,
+      visible: isAdmin,
+    },
+  ];
+
   return (
     <div className="px-4 py-4 md:px-6 md:py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Administration</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Account Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Quick access to user, role, and password management.
+          Manage your personal information and security preferences.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {adminActions.map((action) => {
+        {actions.filter(a => a.visible).map((action) => {
           const Icon = action.icon
 
           return (
@@ -53,7 +60,7 @@ export default function AdminHomePage() {
               <CardContent>
                 <Button asChild className="w-full shadow-sm">
                   <Link href={action.href}>
-                    Open <ArrowRight />
+                    Go to {action.title.split(" ").pop()} <ArrowRight />
                   </Link>
                 </Button>
               </CardContent>
