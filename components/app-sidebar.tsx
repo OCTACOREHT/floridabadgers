@@ -127,7 +127,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const isFinance = user.role === "finance"
   const filteredNavMain = isFinance
     ? data.navMain.filter((item) => 
-        ["Quick Payment", "Dashboard", "Finance", "Payments", "Reports", "Payment Tracking"].includes(item.title)
+        ["Quick Payment", "Finance", "Payments", "Reports", "Payment Tracking"].includes(item.title)
       )
     : data.navMain
 

@@ -57,7 +57,7 @@ export default function ReportsDashboard({ data }: ReportsDashboardProps) {
       });
       return acc;
     }, [] as number[]);
-    worksheet["!cols"] = maxWidths.map(w => ({ w: w + 2 }));
+    worksheet["!cols"] = maxWidths.map((w) => ({ wch: w + 2 }));
 
     XLSX.writeFile(workbook, `Florida_Badgers_Finance_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
   };

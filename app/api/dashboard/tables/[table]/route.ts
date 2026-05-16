@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { getAuthenticatedUserFromRequest } from "@/lib/auth/session";
 import { requireApiUser, requireApiUserWithUser } from "@/lib/auth/api-guard";
 import {
   enrichPaymentRowsWithRegistrationDetails,
@@ -9,6 +9,10 @@ import {
   normalizeTablePayload,
 } from "@/lib/dashboard/tables";
 import { resolveArticleAuthorId } from "@/lib/dashboard/article-author";
+import {
+  createClubMailerContext,
+  renderPaymentReceiptEmail,
+} from "@/lib/email/club-email";
 
 export const runtime = "nodejs";
 
@@ -16,6 +20,209 @@ function parseLimit(value: string | null): number {
   const parsed = Number.parseInt(value ?? "", 10);
   if (!Number.isFinite(parsed)) return 80;
   return Math.max(1, Math.min(parsed, 300));
+}
+
+function asText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function formatCurrency(value: number): string {
+  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatPaymentDate(value: unknown): string {
+  const text = asText(value);
+  if (!text) return "-";
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatPaymentMethod(value: unknown): string {
+  const normalized = asText(value).toLowerCase();
+  if (!normalized) return "-";
+  const labels: Record<string, string> = {
+    zelle: "Zelle",
+    cash: "Cash",
+    transfer: "Bank Transfer",
+    card: "Card",
+    check: "Check",
+  };
+  return labels[normalized] ?? normalized;
+}
+
+function formatPaymentStatus(value: unknown): string {
+  const normalized = asText(value).toLowerCase();
+  if (!normalized) return "-";
+  const labels: Record<string, string> = {
+    paid: "Paid",
+    pending: "Pending",
+    cancelled: "Cancelled",
+  };
+  return labels[normalized] ?? normalized;
+}
+
+function formatFeeType(value: unknown): string {
+  const normalized = asText(value).toLowerCase();
+  if (!normalized) return "Payment";
+  const labels: Record<string, string> = {
+    registration: "Registration Fee",
+    monthly: "Monthly Fee",
+    equipment: "Equipment Fee",
+    other: "Custom Payment",
+  };
+  return labels[normalized] ?? normalized;
+}
+
+function parseBundleInfo(notes: string): { current: number; total: number } | null {
+  const match = notes.match(/bundle payment\s*\((\d+)\s*\/\s*(\d+)\)/i);
+  if (!match) return null;
+
+  const current = Number.parseInt(match[1] ?? "", 10);
+  const total = Number.parseInt(match[2] ?? "", 10);
+  if (!Number.isFinite(current) || !Number.isFinite(total) || current <= 0 || total <= 0) {
+    return null;
+  }
+  return { current, total };
+}
+
+function getPlayerNameFromPaymentRow(row: Record<string, unknown>): string {
+  const registrationName = asText(row.registration_player_name);
+  if (registrationName) return registrationName;
+
+  const relation = row.joueurs;
+  const source =
+    Array.isArray(relation) ? relation.find((item) => item && typeof item === "object") : relation;
+
+  if (source && typeof source === "object") {
+    const prenom = asText((source as Record<string, unknown>).prenom);
+    const nom = asText((source as Record<string, unknown>).nom);
+    const fullName = `${prenom} ${nom}`.trim();
+    if (fullName) return fullName;
+  }
+
+  return "Player";
+}
+
+async function sendPaymentReceiptEmail(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  paymentRow: Record<string, unknown>
+): Promise<void> {
+  const receiver = asText(paymentRow.registration_email);
+  if (!isEmail(receiver)) return;
+
+  const paymentId = asText(paymentRow.id);
+  if (!paymentId) return;
+
+  const receiptNumber = `FBCA-RCPT-${paymentId.slice(0, 8).toUpperCase()}`;
+  const generatedAt = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
+
+  let playerName = getPlayerNameFromPaymentRow(paymentRow);
+  if (playerName === "Player") {
+    const playerId = asText(paymentRow.joueur_id);
+    if (playerId) {
+      const { data: player } = await supabase
+        .from("joueurs")
+        .select("prenom, nom")
+        .eq("id", playerId)
+        .maybeSingle();
+      const prenom = asText(player?.prenom);
+      const nom = asText(player?.nom);
+      const fullName = `${prenom} ${nom}`.trim();
+      if (fullName) playerName = fullName;
+    }
+  }
+
+  const notes = asText(paymentRow.notes);
+  const bundleInfo = parseBundleInfo(notes);
+  if (bundleInfo && bundleInfo.current < bundleInfo.total) {
+    return;
+  }
+
+  const amount = Number(paymentRow.montant ?? 0);
+  let safeAmount = Number.isFinite(amount) ? amount : 0;
+  const method = formatPaymentMethod(paymentRow.methode_paiement);
+  const status = formatPaymentStatus(paymentRow.statut);
+  let description = formatFeeType(paymentRow.type_frais);
+  const paymentDate = formatPaymentDate(paymentRow.date_paiement);
+
+  if (bundleInfo && bundleInfo.current === bundleInfo.total) {
+    const playerId = asText(paymentRow.joueur_id);
+    const paymentDateRaw = asText(paymentRow.date_paiement);
+    if (playerId && paymentDateRaw) {
+      const bundlePattern = `%Bundle payment (%/${bundleInfo.total})%`;
+      const { data: bundleRows } = await supabase
+        .from("paiements")
+        .select("montant")
+        .eq("joueur_id", playerId)
+        .eq("date_paiement", paymentDateRaw)
+        .like("notes", bundlePattern)
+        .limit(20);
+
+      const bundleTotal = (bundleRows ?? []).reduce((sum, row) => {
+        const lineAmount = Number((row as { montant?: unknown }).montant ?? 0);
+        return sum + (Number.isFinite(lineAmount) ? lineAmount : 0);
+      }, 0);
+      if (bundleTotal > 0) {
+        safeAmount = bundleTotal;
+      }
+    }
+    description = "Registration + Monthly Bundle";
+  }
+
+  const mailer = createClubMailerContext();
+  const html = renderPaymentReceiptEmail({
+    logoHtml: mailer.logoHtml,
+    receiptNumber,
+    paymentId,
+    generatedAt,
+    playerName,
+    parentName: asText(paymentRow.parent_name) || "-",
+    parentPhone: asText(paymentRow.parent_phone) || "-",
+    registrationEmail: receiver || "-",
+    registrationPhone: asText(paymentRow.registration_phone) || "-",
+    description,
+    method,
+    status,
+    paymentDate,
+    amount: safeAmount,
+  });
+
+  const text = [
+    "Payment Receipt",
+    "",
+    `Receipt #: ${receiptNumber}`,
+    `Payment ID: ${paymentId}`,
+    `Player: ${playerName}`,
+    `Description: ${description}`,
+    `Method: ${method}`,
+    `Status: ${status}`,
+    `Payment Date: ${paymentDate}`,
+    `Amount: ${formatCurrency(safeAmount)}`,
+  ].join("\n");
+
+  await mailer.transporter.sendMail({
+    from: mailer.fromWithName,
+    to: receiver,
+    subject: `Payment Receipt - ${receiptNumber}`,
+    text,
+    html,
+    attachments: mailer.attachments,
+  });
 }
 
 export async function GET(
@@ -178,13 +385,21 @@ export async function POST(
     }
 
     // Don't return password in response
-    if (data && "password" in data) {
-      delete (data as any).password;
+    if (data && typeof data === "object" && "password" in data) {
+      delete (data as Record<string, unknown>).password;
     }
 
     if (table === "paiements") {
       const [enrichedRow] = await enrichPaymentRowsWithRegistrationDetails(supabase, [data as Record<string, unknown>]);
-      return NextResponse.json({ data: enrichedRow ?? data }, { status: 201 });
+      const paymentRow = (enrichedRow ?? data) as Record<string, unknown>;
+
+      try {
+        await sendPaymentReceiptEmail(supabase, paymentRow);
+      } catch (mailError) {
+        console.error("[payment-receipt-email] Failed to send receipt email", mailError);
+      }
+
+      return NextResponse.json({ data: paymentRow }, { status: 201 });
     }
 
     return NextResponse.json({ data }, { status: 201 });

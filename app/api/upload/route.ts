@@ -1,59 +1,109 @@
-import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
-// Directory where uploaded files will be stored (relative to the project root)
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
-/**
- * Helper to ensure the upload directory exists.
- */
-async function ensureUploadDir() {
-  try {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  } catch (err) {
-    // If the directory cannot be created, propagate the error.
-    console.error('Failed to create upload directory', err);
-    throw err;
+export const runtime = "nodejs";
+
+const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
+const DEFAULT_BUCKET = "registration-photos";
+
+const EXT_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
+
+function extensionFromFile(file: File): string {
+  const byMime = EXT_BY_MIME[file.type.toLowerCase()];
+  if (byMime) return byMime;
+
+  const fromName = file.name.split(".").pop()?.toLowerCase().trim();
+  if (fromName && /^[a-z0-9]{2,8}$/.test(fromName)) {
+    return fromName;
+  }
+
+  return "bin";
+}
+
+async function ensurePublicBucket(bucketName: string) {
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase.storage.getBucket(bucketName);
+  if (!error && data) {
+    if (data.public) return;
+    await supabase.storage.updateBucket(bucketName, { public: true });
+    return;
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(bucketName, {
+    public: true,
+    allowedMimeTypes: ["image/*"],
+    fileSizeLimit: MAX_IMAGE_SIZE_BYTES,
+  });
+
+  if (createError && !createError.message.toLowerCase().includes("already exists")) {
+    throw createError;
   }
 }
 
 /**
  * POST /api/upload
- * Accepts a multipart/form-data request with a single file field named "file".
- * Stores the file in the public/uploads directory and returns the public URL.
+ * Accepts multipart/form-data with a single "file" field and returns a public URL.
+ * Uses Supabase Storage so uploads work in serverless production.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    // Ensure the upload folder exists before handling the request.
-    await ensureUploadDir();
-
-    // Parse the incoming FormData.
     const formData = await request.formData();
-    const file = formData.get('file');
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    const maybeFile = formData.get("file");
+    if (!(maybeFile instanceof File)) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Generate a safe, unique filename.
-    const originalName = file.name || 'upload';
-    const timestamp = Date.now();
-    const safeName = originalName.replace(/[^a-zA-Z0-9.\-_/]/g, '_');
-    const filename = `${timestamp}-${safeName}`;
-    const filePath = path.join(UPLOAD_DIR, filename);
+    if (!maybeFile.type.startsWith("image/")) {
+      return NextResponse.json({ error: "Only image files are allowed." }, { status: 400 });
+    }
 
-    // Read the file into an ArrayBuffer and write it to disk.
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    await fs.writeFile(filePath, buffer);
+    if (maybeFile.size <= 0) {
+      return NextResponse.json({ error: "Image file is empty." }, { status: 400 });
+    }
 
-    // Construct the public URL – Next.js serves files under /public at the root.
-    const url = `/uploads/${filename}`;
-    return NextResponse.json({ url }, { status: 200 });
+    if (maybeFile.size > MAX_IMAGE_SIZE_BYTES) {
+      return NextResponse.json({ error: "Image is too large (max 8MB)." }, { status: 400 });
+    }
+
+    const bucket = (process.env.SUPABASE_REGISTRATION_PHOTOS_BUCKET ?? DEFAULT_BUCKET).trim() || DEFAULT_BUCKET;
+    const extension = extensionFromFile(maybeFile);
+    const filePath = `join/${Date.now()}-${randomUUID()}.${extension}`;
+
+    await ensurePublicBucket(bucket);
+
+    const bytes = await maybeFile.arrayBuffer();
+    const supabase = createSupabaseServiceClient();
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, bytes, {
+      contentType: maybeFile.type || "application/octet-stream",
+      upsert: false,
+      cacheControl: "31536000",
+    });
+
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError.message }, { status: 400 });
+    }
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    return NextResponse.json(
+      {
+        url: data.publicUrl,
+        bucket,
+        path: filePath,
+      },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error('Upload error:', error);
-    const message = error instanceof Error ? error.message : 'Upload failed';
+    console.error("Upload error:", error);
+    const message = error instanceof Error ? error.message : "Upload failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

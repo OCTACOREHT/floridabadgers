@@ -790,7 +790,7 @@ export async function getDashboardFinanceData(): Promise<DashboardFinanceData> {
     .order("date_paiement", { ascending: true });
 
   // 4. Generate the 6 month slots ending with the current month
-  const chartData = [];
+  const chartBuckets: Array<{ month: string; amount: number; key: string }> = [];
   const monthlyBuckets: Record<string, number> = {};
 
   for (let i = 5; i >= 0; i--) {
@@ -800,7 +800,7 @@ export async function getDashboardFinanceData(): Promise<DashboardFinanceData> {
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
     const label = d.toLocaleDateString("en-US", { month: "short" });
     
-    chartData.push({ month: label, amount: 0, key });
+    chartBuckets.push({ month: label, amount: 0, key });
     monthlyBuckets[key] = 0;
   }
 
@@ -816,11 +816,11 @@ export async function getDashboardFinanceData(): Promise<DashboardFinanceData> {
     }
   });
 
-  // 6. Finalize chartData
-  chartData.forEach(item => {
-    item.amount = monthlyBuckets[item.key as string] || 0;
-    delete item.key;
-  });
+  // 6. Finalize chartData in the public shape expected by DashboardFinanceData
+  const chartData = chartBuckets.map((item) => ({
+    month: item.month,
+    amount: monthlyBuckets[item.key] || 0,
+  }));
 
   const recentPayments = (recentRaw.data || []).map(p => ({
     id: p.id,

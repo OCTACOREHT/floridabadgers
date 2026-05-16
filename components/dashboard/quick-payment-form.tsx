@@ -204,7 +204,7 @@ export default function QuickPaymentForm({ players }: QuickPaymentFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex h-[calc(100vh-90px)] min-h-[680px] w-full max-w-none flex-col overflow-hidden border border-[#D9D9D9] bg-transparent text-[#050505]"
+      className="flex min-h-[680px] w-full max-w-none flex-col overflow-y-auto border border-[#D9D9D9] bg-transparent text-[#050505]"
     >
       <div className="flex items-center justify-between border-b border-[#2E2424] bg-[#000000] px-4 py-2 text-white">
         <div className="flex items-center gap-2.5">
