@@ -1,6 +1,10 @@
+import { redirect } from "next/navigation";
+
 import {
   getDashboardRegistrationRowsByStatut,
 } from "@/lib/dashboard/tables";
+import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session";
+import { normalizeDashboardRole } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +61,12 @@ function mapRows(rows: Record<string, unknown>[], source: "Junior" | "Tryout"): 
 }
 
 export default async function DashboardNotPlayersPage() {
+  const user = await getAuthenticatedUserFromServerCookies();
+  const role = normalizeDashboardRole(user?.role);
+  if (role !== "admin") {
+    redirect("/dashboard?error=unauthorized");
+  }
+
   const [juniorRows, stageRows] = await Promise.all([
     getDashboardRegistrationRowsByStatut("inscriptions_joueurs", "refuse", 400),
     getDashboardRegistrationRowsByStatut("inscriptions_stage", "refuse", 400),

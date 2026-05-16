@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation"
+
 import { DashboardAnalyticsCharts } from "@/components/dashboard/analytics-charts"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { DataTable } from "@/components/data-table"
@@ -8,10 +10,27 @@ import {
   getDashboardOverviewData,
   getDashboardRegistrationRows,
 } from "@/lib/dashboard/data"
+import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session"
+import { normalizeDashboardRole } from "@/lib/auth/permissions"
 
 export const dynamic = "force-dynamic"
 
 export default async function Page() {
+  const user = await getAuthenticatedUserFromServerCookies()
+  const role = normalizeDashboardRole(user?.role)
+
+  if (!role) {
+    redirect("/login")
+  }
+
+  if (role === "finance") {
+    redirect("/dashboard/finance")
+  }
+
+  if (role === "media") {
+    redirect("/dashboard/articles")
+  }
+
   const [overview, chartData, analyticsData, registrations] = await Promise.all([
     getDashboardOverviewData(),
     getDashboardChartData(90),

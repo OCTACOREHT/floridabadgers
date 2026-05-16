@@ -1,9 +1,20 @@
+import { redirect } from "next/navigation"
+
 import { DashboardAnalyticsCharts } from "@/components/dashboard/analytics-charts"
 import { getDashboardAnalyticsData } from "@/lib/dashboard/data"
+import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session"
+import { normalizeDashboardRole } from "@/lib/auth/permissions"
 
 export const dynamic = "force-dynamic"
 
 export default async function DashboardAnalyticsPage() {
+  const user = await getAuthenticatedUserFromServerCookies()
+  const role = normalizeDashboardRole(user?.role)
+
+  if (role !== "admin" && role !== "media") {
+    redirect("/dashboard?error=unauthorized")
+  }
+
   const analyticsData = await getDashboardAnalyticsData()
 
   return (

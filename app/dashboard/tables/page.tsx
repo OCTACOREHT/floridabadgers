@@ -3,21 +3,20 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardTableNames, getDashboardTableConfig } from "@/lib/dashboard/tables";
 import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session";
+import {
+  canAccessDashboardTable,
+  normalizeDashboardRole,
+} from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardTablesPage() {
   const user = await getAuthenticatedUserFromServerCookies();
-  const isAdmin = user?.role === "admin";
-  const isFinance = user?.role === "finance";
+  const role = normalizeDashboardRole(user?.role);
+  const isAdmin = role === "admin";
 
   const allTableNames = getDashboardTableNames();
-  
-  // Filter tables based on role
-  const allowedTablesForFinance = ["paiements", "users"];
-  const tableNames = isAdmin 
-    ? allTableNames 
-    : allTableNames.filter(name => isFinance ? allowedTablesForFinance.includes(name) : false);
+  const tableNames = allTableNames.filter((name) => canAccessDashboardTable(role, name));
 
   return (
     <div className="px-4 py-4 md:px-6 md:py-6">
@@ -54,4 +53,3 @@ export default async function DashboardTablesPage() {
     </div>
   );
 }
-

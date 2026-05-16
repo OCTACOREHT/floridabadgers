@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDashboardOverviewData } from "@/lib/dashboard/data";
-import { requireApiUser } from "@/lib/auth/api-guard";
+import { requireApiUserWithUser } from "@/lib/auth/api-guard";
+import { normalizeDashboardRole } from "@/lib/auth/permissions";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const guardResponse = await requireApiUser(request);
-  if (guardResponse) return guardResponse;
+  const auth = await requireApiUserWithUser(request);
+  if (auth.response) return auth.response;
+  const role = normalizeDashboardRole(auth.user?.role);
+  if (role !== "admin") {
+    return NextResponse.json({ error: "Forbidden: Unauthorized role." }, { status: 403 });
+  }
 
   try {
     const data = await getDashboardOverviewData();

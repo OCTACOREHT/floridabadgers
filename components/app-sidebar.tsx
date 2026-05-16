@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 
 import { AuthenticatedUser } from "@/lib/auth/session"
+import { normalizeDashboardRole } from "@/lib/auth/permissions"
 
 const data = {
   // ... (keep static data as is or remove user from it)
@@ -123,13 +124,29 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
-  // Filter nav items based on role
-  const isFinance = user.role === "finance"
-  const filteredNavMain = isFinance
-    ? data.navMain.filter((item) => 
-        ["Quick Payment", "Finance", "Payments", "Reports", "Payment Tracking"].includes(item.title)
-      )
-    : data.navMain
+  const role = normalizeDashboardRole(user.role)
+
+  const financeItems = new Set([
+    "Quick Payment",
+    "Finance",
+    "Payments",
+    "Reports",
+    "Payment Tracking",
+  ])
+  const mediaItems = new Set([
+    "Articles",
+    "Hero Carousel",
+    "Contact Messages",
+  ])
+
+  const filteredNavMain =
+    role === "admin"
+      ? data.navMain
+      : role === "finance"
+        ? data.navMain.filter((item) => financeItems.has(item.title))
+        : role === "media"
+          ? data.navMain.filter((item) => mediaItems.has(item.title))
+          : []
 
   const sidebarUser = {
     name: user.full_name || user.email?.split("@")[0] || "User",
@@ -161,7 +178,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={filteredNavMain} />
-        {user.role === "admin" && <NavAdmin />}
+        {role === "admin" && <NavAdmin />}
         <NavSecondary items={data.navSecondary} />
       </SidebarContent>
       <SidebarFooter>

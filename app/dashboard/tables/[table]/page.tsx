@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { DashboardTableManager } from "@/components/dashboard/table-manager";
 import { getDashboardTableConfig, getDashboardTableRows } from "@/lib/dashboard/tables";
 import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session";
+import { canAccessDashboardTable, normalizeDashboardRole } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,18 +19,10 @@ export default async function DashboardTablePage({
   }
 
   const user = await getAuthenticatedUserFromServerCookies();
-  const isAdmin = user?.role === "admin";
-  const isFinance = user?.role === "finance";
+  const role = normalizeDashboardRole(user?.role);
+  const isAdmin = role === "admin";
 
-  // Security: Role-based Table Access Control
-  const allowedTablesForFinance = ["paiements", "users"];
-  
-  if (isFinance && !allowedTablesForFinance.includes(table)) {
-    redirect("/dashboard?error=unauthorized");
-  }
-
-  // If not admin and not finance, and trying to access something else (safety net)
-  if (!isAdmin && !isFinance) {
+  if (!canAccessDashboardTable(role, table)) {
     redirect("/dashboard?error=unauthorized");
   }
   

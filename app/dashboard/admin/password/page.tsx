@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, KeyRound, LockKeyhole, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session";
+import { normalizeDashboardRole } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +15,13 @@ const steps = [
   "Apply the password reset flow through your auth backend.",
 ] as const;
 
-export default function AdminPasswordPage() {
+export default async function AdminPasswordPage() {
+  const user = await getAuthenticatedUserFromServerCookies();
+  const role = normalizeDashboardRole(user?.role);
+  if (role !== "admin") {
+    redirect("/dashboard?error=unauthorized");
+  }
+
   return (
     <div className="px-4 py-4 md:px-6 md:py-6">
       <div className="mb-6">

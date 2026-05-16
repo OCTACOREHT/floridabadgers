@@ -13,6 +13,7 @@ import {
   createClubMailerContext,
   renderPaymentReceiptEmail,
 } from "@/lib/email/club-email";
+import { canAccessDashboardTable, normalizeDashboardRole } from "@/lib/auth/permissions";
 
 export const runtime = "nodejs";
 
@@ -239,15 +240,8 @@ export async function GET(
   }
 
   const user = await getAuthenticatedUserFromRequest(request);
-  const isAdmin = user?.role === "admin";
-  const isFinance = user?.role === "finance";
-  const allowedTablesForFinance = ["paiements", "users"];
-
-  if (isFinance && !allowedTablesForFinance.includes(table)) {
-    return NextResponse.json({ error: "Forbidden: You do not have permission to view this table." }, { status: 403 });
-  }
-
-  if (!isAdmin && !isFinance) {
+  const role = normalizeDashboardRole(user?.role);
+  if (!canAccessDashboardTable(role, table)) {
     return NextResponse.json({ error: "Forbidden: Unauthorized role." }, { status: 403 });
   }
 
@@ -280,15 +274,10 @@ export async function POST(
   try {
     const body = (await request.json()) as Record<string, unknown>;
     
-    const isAdmin = authenticatedUser?.role === "admin";
-    const isFinance = authenticatedUser?.role === "finance";
-    const allowedTablesForFinance = ["paiements", "users"];
+    const role = normalizeDashboardRole(authenticatedUser?.role);
+    const isAdmin = role === "admin";
 
-    if (isFinance && !allowedTablesForFinance.includes(table)) {
-      return NextResponse.json({ error: "Forbidden: You do not have permission to modify this table." }, { status: 403 });
-    }
-
-    if (!isAdmin && !isFinance) {
+    if (!canAccessDashboardTable(role, table)) {
       return NextResponse.json({ error: "Forbidden: Unauthorized role." }, { status: 403 });
     }
 
