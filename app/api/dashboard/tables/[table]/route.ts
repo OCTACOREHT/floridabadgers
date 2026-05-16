@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { requireApiUser, requireApiUserWithUser } from "@/lib/auth/api-guard";
 import {
+  enrichPaymentRowsWithRegistrationDetails,
   getDashboardTableConfig,
   getDashboardTableRows,
   normalizeTablePayload,
@@ -179,6 +180,11 @@ export async function POST(
     // Don't return password in response
     if (data && "password" in data) {
       delete (data as any).password;
+    }
+
+    if (table === "paiements") {
+      const [enrichedRow] = await enrichPaymentRowsWithRegistrationDetails(supabase, [data as Record<string, unknown>]);
+      return NextResponse.json({ data: enrichedRow ?? data }, { status: 201 });
     }
 
     return NextResponse.json({ data }, { status: 201 });

@@ -1511,25 +1511,36 @@ export function DashboardTableManager({ config, initialRows, currentUser }: Prop
 
     let currentY = 74;
 
-    drawSectionTitle("PLAYER DETAILS", currentY);
-    currentY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.text("PLAYER DETAILS", margin, currentY);
+    currentY += 7;
 
-    const drawPlainDetail = (label: string, value: string, y: number) => {
+    const playerMetaRows: Array<{ label: string; value: string }> = [
+      { label: "Player Name", value: playerName },
+      { label: "Parent / Guardian", value: parentName },
+      { label: "Parent Phone", value: parentPhone },
+      { label: "Registration Email", value: registrationEmail },
+      { label: "Registration Phone", value: registrationPhone },
+    ];
+    const drawLeftMetaLine = (y: number, label: string, value: string) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.6);
-      doc.setTextColor(36, 36, 36);
-      doc.text(`${label}:`, margin, y);
+      doc.setTextColor(35, 35, 35);
+      const labelText = `${label}: `;
+      const labelWidth = doc.getTextWidth(labelText);
+      doc.text(labelText, margin, y);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(0, 0, 0);
-      doc.text(value || "-", margin + 48, y);
+      doc.text(value || "-", margin + labelWidth, y);
     };
 
-    drawPlainDetail("Player Name", playerName, currentY + 1.5);
-    drawPlainDetail("Parent / Guardian", parentName, currentY + 9.5);
-    drawPlainDetail("Parent Phone", parentPhone, currentY + 17.5);
-    drawPlainDetail("Registration Email", registrationEmail, currentY + 25.5);
-    drawPlainDetail("Registration Phone", registrationPhone, currentY + 33.5);
-    currentY += 43;
+    const playerMetaLineHeight = 8;
+    playerMetaRows.forEach((rowMeta, index) => {
+      drawLeftMetaLine(currentY + index * playerMetaLineHeight, rowMeta.label, rowMeta.value);
+    });
+    currentY += playerMetaRows.length * playerMetaLineHeight + 3;
 
     if (currentY > 208) {
       doc.addPage();

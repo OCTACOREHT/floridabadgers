@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { getDashboardTableConfig, normalizeTablePayload } from "@/lib/dashboard/tables";
+import {
+  enrichPaymentRowsWithRegistrationDetails,
+  getDashboardTableConfig,
+  normalizeTablePayload,
+} from "@/lib/dashboard/tables";
 import { requireApiUser, requireApiUserWithUser } from "@/lib/auth/api-guard";
 import { resolveArticleAuthorId } from "@/lib/dashboard/article-author";
 import { createClubMailerContext, renderClubBrandedEmail } from "@/lib/email/club-email";
@@ -683,6 +687,13 @@ export async function PATCH(
         } catch (mailError) {
           console.error("[registration-status-email] Failed to send status email", mailError);
         }
+      }
+    }
+
+    if (table === "paiements") {
+      const [enrichedPaymentRow] = await enrichPaymentRowsWithRegistrationDetails(supabase, [responseData]);
+      if (enrichedPaymentRow) {
+        responseData = enrichedPaymentRow;
       }
     }
 

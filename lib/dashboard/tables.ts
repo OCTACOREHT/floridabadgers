@@ -366,7 +366,29 @@ function withVirtualColumns(table: string, rows: Record<string, unknown>[]): Rec
   }));
 }
 
-async function withPaymentRegistrationDetails(
+function normalizeLookupName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function getPaymentRowPlayerFullName(row: Record<string, unknown>): string | null {
+  const relation = row.joueurs;
+  const source =
+    Array.isArray(relation) ? relation.find((item) => item && typeof item === "object") : relation;
+
+  if (!source || typeof source !== "object") return null;
+
+  const prenom = typeof (source as Record<string, unknown>).prenom === "string"
+    ? ((source as Record<string, unknown>).prenom as string).trim()
+    : "";
+  const nom = typeof (source as Record<string, unknown>).nom === "string"
+    ? ((source as Record<string, unknown>).nom as string).trim()
+    : "";
+  const fullName = `${prenom} ${nom}`.trim();
+
+  return fullName.length > 0 ? fullName : null;
+}
+
+export async function enrichPaymentRowsWithRegistrationDetails(
   supabase: ReturnType<typeof createSupabaseServiceClient>,
   rows: Record<string, unknown>[]
 ): Promise<Record<string, unknown>[]> {
@@ -383,6 +405,16 @@ async function withPaymentRegistrationDetails(
   if (playerIds.length === 0) return rows;
 
   const parentByPlayerId = new Map<string, RegistrationParentLookupRow>();
+  const playerNameByPlayerId = new Map<string, string>();
+  for (const row of rows) {
+    const playerId = typeof row.joueur_id === "string" ? row.joueur_id : "";
+    if (!playerId) continue;
+    const fullName = getPaymentRowPlayerFullName(row);
+    if (fullName) {
+      playerNameByPlayerId.set(playerId, fullName);
+    }
+  }
+
   const registerRows = (items: RegistrationParentLookupRow[]) => {
     for (const item of items) {
       const playerId = typeof item.player_id === "string" ? item.player_id : "";
@@ -423,9 +455,73 @@ async function withPaymentRegistrationDetails(
   registerRows(juniorRows);
   registerRows(stageRows);
 
+  const unresolvedNames = Array.from(
+    new Set(
+      playerIds
+        .filter((playerId) => !parentByPlayerId.has(playerId))
+        .map((playerId) => playerNameByPlayerId.get(playerId) ?? "")
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0)
+    )
+  );
+
+  const parentByPlayerName = new Map<string, RegistrationParentLookupRow>();
+  const registerRowsByName = (items: RegistrationParentLookupRow[]) => {
+    for (const item of items) {
+      const fullName = typeof item.nom_complet === "string" ? item.nom_complet.trim() : "";
+      if (!fullName) continue;
+
+      const normalizedName = normalizeLookupName(fullName);
+      const existing = parentByPlayerName.get(normalizedName);
+      const existingTime = existing?.created_at ? new Date(existing.created_at).getTime() : 0;
+      const currentTime = item.created_at ? new Date(item.created_at).getTime() : 0;
+
+      if (!existing || currentTime >= existingTime) {
+        parentByPlayerName.set(normalizedName, item);
+      }
+    }
+  };
+
+  const queryParentRowsByName = async (tableName: "inscriptions_joueurs" | "inscriptions_stage") => {
+    const unresolvedNameSet = new Set(unresolvedNames.map((name) => normalizeLookupName(name)));
+    const { data, error } = await supabase
+      .from(tableName)
+      .select(
+        "player_id, nom_parent_tuteur, telephone_parent_tuteur, nom_complet, email, telephone, created_at"
+      )
+      .not("nom_complet", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(2000);
+
+    if (error) {
+      if (isMissingTableError(error) || error.code === "42703") return [];
+      throw new Error(error.message);
+    }
+
+    return ((data ?? []) as RegistrationParentLookupRow[]).filter((item) => {
+      const fullName = typeof item.nom_complet === "string" ? item.nom_complet : "";
+      return unresolvedNameSet.has(normalizeLookupName(fullName));
+    });
+  };
+
+  if (unresolvedNames.length > 0) {
+    const [juniorRowsByName, stageRowsByName] = await Promise.all([
+      queryParentRowsByName("inscriptions_joueurs"),
+      queryParentRowsByName("inscriptions_stage"),
+    ]);
+    registerRowsByName(juniorRowsByName);
+    registerRowsByName(stageRowsByName);
+  }
+
   return rows.map((row) => {
     const playerId = typeof row.joueur_id === "string" ? row.joueur_id : "";
-    const parentInfo = playerId ? parentByPlayerId.get(playerId) : undefined;
+    const playerFullName = playerId ? playerNameByPlayerId.get(playerId) ?? null : null;
+    const parentInfoById = playerId ? parentByPlayerId.get(playerId) : undefined;
+    const parentInfoByName =
+      !parentInfoById && playerFullName
+        ? parentByPlayerName.get(normalizeLookupName(playerFullName))
+        : undefined;
+    const parentInfo = parentInfoById ?? parentInfoByName;
 
     return {
       ...row,
@@ -577,7 +673,7 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
   let rows = withVirtualColumns(table, rawRows);
 
   if (table === "paiements") {
-    rows = await withPaymentRegistrationDetails(supabase, rows);
+    rows = await enrichPaymentRowsWithRegistrationDetails(supabase, rows);
     return rows;
   }
 
