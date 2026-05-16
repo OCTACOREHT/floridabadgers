@@ -26,6 +26,7 @@ import {
   Settings2Icon,
   LayoutPanelTopIcon,
   MailIcon,
+  XCircleIcon,
 } from "lucide-react"
 
 const data = {
@@ -74,6 +75,11 @@ const data = {
       title: "Hero Carousel",
       url: "/dashboard/tables/hero_slides",
       icon: <LayoutPanelTopIcon />,
+    },
+    {
+      title: "Not Players",
+      url: "/dashboard/not-players",
+      icon: <XCircleIcon />,
     },
   ],
   navSecondary: [

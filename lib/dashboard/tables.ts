@@ -31,6 +31,8 @@ export type DashboardTableConfig = {
   orderBy?: string;
 };
 
+export type RegistrationStatut = "en_attente" | "accepte" | "refuse";
+
 type SiteEventClickRow = {
   path: string | null;
   event_value: number | null;
@@ -82,7 +84,7 @@ const TABLE_CONFIGS = {
     table: "joueurs",
     label: "Players",
     description: "Public player roster",
-    listColumns: ["prenom", "nom", "poste", "niveau", "is_active", "created_at"],
+    listColumns: ["prenom", "nom", "dossard", "poste", "niveau", "is_active"],
     createFields: [
       { key: "nom", label: "Last Name", type: "text", required: true },
       { key: "prenom", label: "First Name", type: "text", required: true },
@@ -110,18 +112,18 @@ const TABLE_CONFIGS = {
         label: "Program",
         type: "select",
         required: true,
-        options: ["Junior Program", "Development", "Elite", "Stage"],
+        options: ["junior_foundation", "junior_development", "junior_elite", "stage_english"],
       },
       { key: "nom_complet", label: "Full Name", type: "text", required: true },
       { key: "date_naissance", label: "Birth Date", type: "date", required: true },
       { key: "age", label: "Age", type: "number", required: true },
-      { key: "sexe", label: "Sex", type: "select", required: true, options: ["Male", "Female"] },
+      { key: "sexe", label: "Sex", type: "select", required: true, options: ["Masculin", "Feminin"] },
       { key: "adresse", label: "Address", type: "text", required: true },
       { key: "telephone", label: "Phone", type: "text", required: true },
       { key: "email", label: "Email", type: "email", required: true },
       { key: "photo_url", label: "Photo", type: "text" },
-      { key: "poste_jeu", label: "Position", type: "select", required: true, options: ["Goalkeeper", "Defender", "Midfielder", "Forward"] },
-      { key: "niveau_jeu", label: "Level", type: "select", required: true, options: ["Beginner", "Intermediate", "Advanced"] },
+      { key: "poste_jeu", label: "Position", type: "select", required: true, options: ["Gardien", "Defenseur", "Milieu", "Attaquant"] },
+      { key: "niveau_jeu", label: "Level", type: "select", required: true, options: ["Debutant", "Intermediaire", "Avance"] },
       { key: "club_actuel", label: "Current Club", type: "text" },
       { key: "experience_football", label: "Football Experience", type: "textarea" },
       { key: "categorie_id", label: "Category ID", type: "uuid", required: true },
@@ -192,7 +194,7 @@ const TABLE_CONFIGS = {
     table: "contact_messages",
     label: "Contact Messages",
     description: "Messages sent from the website contact form",
-    listColumns: ["full_name", "email", "subject", "status", "created_at"],
+    listColumns: ["full_name", "email", "status", "created_at"],
     createFields: [
       { key: "full_name", label: "Full Name", type: "text", required: true },
       { key: "email", label: "Email", type: "email", required: true },
@@ -315,6 +317,18 @@ function withVirtualColumns(table: string, rows: Record<string, unknown>[]): Rec
   }));
 }
 
+function buildSelectExpression(table: string, config: DashboardTableConfig): string {
+  const virtualColumns = TABLES_WITH_VIRTUAL_REGISTRATION_ID.has(table)
+    ? new Set(["registration_id"])
+    : new Set<string>();
+
+  const selectColumns = Array.from(
+    new Set(["id", ...config.listColumns, ...config.createFields.map((field) => field.key)])
+  ).filter((column) => !virtualColumns.has(column));
+
+  return selectColumns.join(", ");
+}
+
 function coerceFieldValue(field: DashboardTableField, value: unknown): unknown {
   if (field.type === "boolean") {
     if (typeof value === "boolean") return value;
@@ -417,15 +431,7 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
 
   const supabase = createSupabaseServiceClient();
   const safeLimit = Math.max(1, Math.min(limit, 300));
-
-  const virtualColumns = TABLES_WITH_VIRTUAL_REGISTRATION_ID.has(table)
-    ? new Set(["registration_id"])
-    : new Set<string>();
-
-  const selectColumns = Array.from(
-    new Set(["id", ...config.listColumns, ...config.createFields.map((field) => field.key)])
-  ).filter((column) => !virtualColumns.has(column));
-  const selectExpr = selectColumns.join(", ");
+  const selectExpr = buildSelectExpression(table, config);
 
   const { data, error } = await supabase
     .from(config.table)
@@ -488,4 +494,36 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
       clicks_count: rowId ? clickMap.get(rowId) ?? 0 : 0,
     };
   });
+}
+
+export async function getDashboardRegistrationRowsByStatut(
+  table: "inscriptions_joueurs" | "inscriptions_stage",
+  statut: RegistrationStatut,
+  limit = 300
+): Promise<Record<string, unknown>[]> {
+  const config = getDashboardTableConfig(table);
+  if (!config) {
+    throw new Error("Unsupported table.");
+  }
+
+  const supabase = createSupabaseServiceClient();
+  const safeLimit = Math.max(1, Math.min(limit, 500));
+  const selectExpr = buildSelectExpression(table, config);
+
+  const { data, error } = await supabase
+    .from(config.table)
+    .select(selectExpr)
+    .eq("statut", statut)
+    .order(config.orderBy ?? "created_at", { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      return [];
+    }
+    throw new Error(error.message);
+  }
+
+  const rawRows = (data ?? []) as unknown as Record<string, unknown>[];
+  return withVirtualColumns(table, rawRows);
 }

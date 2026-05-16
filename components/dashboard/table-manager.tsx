@@ -13,8 +13,6 @@ import {
   SearchIcon,
   Trash2Icon,
   DownloadIcon,
-  CheckIcon,
-  XIcon,
   MailIcon,
 } from "lucide-react";
 import jsPDF from "jspdf";
@@ -68,10 +66,12 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "-";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === "junior_foundation") return "Junior Program";
-  if (value === "stage_english") return "Stage Program";
+  if (value === "junior_development") return "Junior Development";
+  if (value === "junior_elite") return "Junior Elite";
+  if (value === "stage_english") return "Tryout";
   if (value === "en_attente") return "Pending";
   if (value === "accepte") return "Accepted";
-  if (value === "refuse") return "Refused";
+  if (value === "refuse") return "Not Accepted";
 
   // Auto-format ISO dates
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
@@ -97,6 +97,72 @@ function isValidEmailAddress(value: string): boolean {
 function getRowStringValue(row: Record<string, unknown>, key: string): string {
   const value = row[key];
   return typeof value === "string" ? value.trim() : "";
+}
+
+function formatProgramOptionLabel(value: string): string {
+  if (value === "junior_foundation") return "Junior Program";
+  if (value === "junior_development") return "Junior Development";
+  if (value === "junior_elite") return "Junior Elite";
+  if (value === "stage_english") return "Tryout";
+  return value;
+}
+
+type RegistrationStatusValue = "en_attente" | "accepte" | "refuse";
+type ContactMessageStatusValue = "new" | "in_progress" | "replied" | "closed";
+type PendingStatusChange = {
+  rowId: string;
+  kind: "registration" | "contact";
+  nextStatus: RegistrationStatusValue | ContactMessageStatusValue;
+  currentStatus: RegistrationStatusValue | ContactMessageStatusValue;
+};
+
+function normalizeRegistrationStatus(value: unknown): RegistrationStatusValue {
+  if (value === "accepte") return "accepte";
+  if (value === "refuse") return "refuse";
+  return "en_attente";
+}
+
+function normalizeContactMessageStatus(value: unknown): ContactMessageStatusValue {
+  if (value === "in_progress") return "in_progress";
+  if (value === "replied") return "replied";
+  if (value === "closed") return "closed";
+  return "new";
+}
+
+function getRegistrationStatusLabel(status: RegistrationStatusValue): string {
+  if (status === "accepte") return "Accepted";
+  if (status === "refuse") return "Not Accepted";
+  return "Pending";
+}
+
+function getContactMessageStatusLabel(status: ContactMessageStatusValue): string {
+  if (status === "in_progress") return "In Progress";
+  if (status === "replied") return "Replied";
+  if (status === "closed") return "Closed";
+  return "New";
+}
+
+function getRegistrationStatusStyles(status: RegistrationStatusValue): string {
+  if (status === "accepte") {
+    return "border-emerald-300 bg-emerald-50 text-emerald-700";
+  }
+  if (status === "refuse") {
+    return "border-rose-300 bg-rose-50 text-rose-700";
+  }
+  return "border-amber-300 bg-amber-50 text-amber-700";
+}
+
+function getContactStatusStyles(status: ContactMessageStatusValue): string {
+  if (status === "in_progress") {
+    return "border-sky-300 bg-sky-50 text-sky-700";
+  }
+  if (status === "replied") {
+    return "border-emerald-300 bg-emerald-50 text-emerald-700";
+  }
+  if (status === "closed") {
+    return "border-zinc-300 bg-zinc-100 text-zinc-700";
+  }
+  return "border-zinc-300 bg-zinc-100 text-zinc-900";
 }
 
 const ARTICLE_FALLBACK_IMAGE = "/images/IMG_6281.JPG.jpeg";
@@ -439,6 +505,94 @@ function toDatetimeLocal(value: string): string {
   return localDate.toISOString().slice(0, 16);
 }
 
+function normalizeTextForMatch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll("Ã©", "e")
+    .replaceAll("Ã¨", "e")
+    .replaceAll("Ãª", "e")
+    .replaceAll("Ã", "a")
+    .toLowerCase()
+    .trim();
+}
+
+function normalizeProgramValue(rawValue: string): string {
+  const normalized = normalizeTextForMatch(rawValue);
+  if (!normalized) return "";
+  if (normalized.includes("stage")) return "stage_english";
+  if (normalized.includes("elite")) return "junior_elite";
+  if (normalized.includes("develop")) return "junior_development";
+  return "junior_foundation";
+}
+
+function normalizeSexValue(rawValue: string): string {
+  const normalized = normalizeTextForMatch(rawValue);
+  if (!normalized) return "";
+  if (normalized.includes("fem")) return "Feminin";
+  if (normalized.includes("mas") || normalized === "male") return "Masculin";
+  return rawValue;
+}
+
+function normalizePositionValue(rawValue: string): string {
+  const normalized = normalizeTextForMatch(rawValue);
+  if (!normalized) return "";
+  if (normalized.includes("gard") || normalized.includes("goal")) return "Gardien";
+  if (normalized.includes("def")) return "Defenseur";
+  if (normalized.includes("mil") || normalized.includes("mid")) return "Milieu";
+  if (normalized.includes("att") || normalized.includes("forw")) return "Attaquant";
+  return rawValue;
+}
+
+function normalizeLevelValue(rawValue: string): string {
+  const normalized = normalizeTextForMatch(rawValue);
+  if (!normalized) return "";
+  if (normalized.includes("deb") || normalized.includes("beg")) return "Debutant";
+  if (normalized.includes("inter") || normalized.includes("int")) return "Intermediaire";
+  if (normalized.includes("avan") || normalized.includes("adv")) return "Avance";
+  return rawValue;
+}
+
+function normalizeRegisteredByValue(rawValue: string): string {
+  const normalized = normalizeTextForMatch(rawValue);
+  if (!normalized) return "";
+  if (normalized.includes("parent")) return "parent_tuteur";
+  if (normalized.includes("joueur") || normalized.includes("player")) return "joueur";
+  return rawValue;
+}
+
+function alignSelectValue(
+  config: DashboardTableConfig,
+  field: DashboardTableField,
+  rawValue: string
+): string {
+  const table = config.table;
+  const fieldKey = field.key;
+  let candidate = rawValue;
+
+  if (table === "inscriptions_joueurs" || table === "inscriptions_stage") {
+    if (fieldKey === "programme_inscription") {
+      candidate = normalizeProgramValue(rawValue);
+    } else if (fieldKey === "sexe") {
+      candidate = normalizeSexValue(rawValue);
+    } else if (fieldKey === "poste_jeu") {
+      candidate = normalizePositionValue(rawValue);
+    } else if (fieldKey === "niveau_jeu") {
+      candidate = normalizeLevelValue(rawValue);
+    } else if (fieldKey === "inscrit_par") {
+      candidate = normalizeRegisteredByValue(rawValue);
+    }
+  }
+
+  const options = field.options ?? [];
+  if (options.length === 0) return candidate;
+  if (options.includes(candidate)) return candidate;
+
+  const normalizedCandidate = normalizeTextForMatch(candidate);
+  const bestMatch = options.find((option) => normalizeTextForMatch(option) === normalizedCandidate);
+  return bestMatch ?? candidate;
+}
+
 function buildFormFromRow(
   config: DashboardTableConfig,
   row: Record<string, unknown>
@@ -448,7 +602,17 @@ function buildFormFromRow(
     if (field.type === "boolean") {
       return [field.key, Boolean(raw)];
     }
-    if (raw === undefined || raw === null) {
+    if (raw === undefined || raw === null || (typeof raw === "string" && !raw.trim())) {
+      if (field.key === "signature_nom") {
+        return [field.key, String(row.nom_complet ?? "")];
+      }
+      if (field.key === "signature_parent_nom") {
+        return [field.key, String(row.nom_parent_tuteur ?? "")];
+      }
+      if (field.key === "signature_date" || field.key === "signature_parent_date") {
+        const fallback = typeof row.created_at === "string" ? row.created_at.slice(0, 10) : "";
+        return [field.key, fallback];
+      }
       return [field.key, ""];
     }
     if (field.type === "date") {
@@ -456,6 +620,10 @@ function buildFormFromRow(
     }
     if (field.type === "datetime") {
       return [field.key, toDatetimeLocal(String(raw))];
+    }
+    if (field.type === "select") {
+      const nextValue = alignSelectValue(config, field, String(raw));
+      return [field.key, nextValue];
     }
     if (field.type === "json") {
       return [field.key, typeof raw === "string" ? raw : JSON.stringify(raw, null, 2)];
@@ -471,6 +639,12 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [tableError, setTableError] = useState<string | null>(null);
+  const [pendingStatusChange, setPendingStatusChange] = useState<PendingStatusChange | null>(null);
+  const [statusUpdateInFlightId, setStatusUpdateInFlightId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleteInFlightId, setDeleteInFlightId] = useState<string | null>(null);
+  const [pendingPanelSubmit, setPendingPanelSubmit] = useState(false);
+  const [showOnlyNewMessages, setShowOnlyNewMessages] = useState(false);
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<PanelMode>("create");
@@ -493,6 +667,8 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const isPlayersTable = config.table === "joueurs";
   const isArticlesTable = config.table === "actualites";
   const isContactMessagesTable = config.table === "contact_messages";
+  const isRegistrationTable =
+    config.table === "inscriptions_joueurs" || config.table === "inscriptions_stage";
   const visibleFields = useMemo(
     () => config.createFields.filter((field) => !(isPlayersTable && field.key === "bio")),
     [config.createFields, isPlayersTable]
@@ -520,12 +696,28 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   );
   const articleDescriptionValue = isArticlesTable ? String(panelValues.description ?? "") : "";
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const newMessagesCount = useMemo(
+    () =>
+      rows.filter((row) => normalizeContactMessageStatus(row.status) === "new").length,
+    [rows]
+  );
   const filteredRows = useMemo(() => {
-    if (!normalizedSearchTerm) {
-      return rows;
+    let scopedRows = rows;
+
+    if (isContactMessagesTable) {
+      scopedRows = scopedRows.filter((row) => {
+        const status = normalizeContactMessageStatus(row.status);
+        if (status === "replied") return false;
+        if (showOnlyNewMessages) return status === "new";
+        return true;
+      });
     }
 
-    return rows.filter((row) => {
+    if (!normalizedSearchTerm) {
+      return scopedRows;
+    }
+
+    return scopedRows.filter((row) => {
       const haystack = Object.entries(row)
         .flatMap(([key, value]) => [key, fieldLabelByKey[key] ?? key, formatValue(value)])
         .join(" ")
@@ -533,7 +725,9 @@ export function DashboardTableManager({ config, initialRows }: Props) {
 
       return haystack.includes(normalizedSearchTerm);
     });
-  }, [fieldLabelByKey, normalizedSearchTerm, rows]);
+  }, [fieldLabelByKey, isContactMessagesTable, normalizedSearchTerm, rows, showOnlyNewMessages]);
+  const isAnyConfirmationOpen =
+    pendingStatusChange !== null || pendingDeleteId !== null || pendingPanelSubmit;
 
   const updateValue = (key: string, value: unknown) => {
     setPanelValues((prev) => ({ ...prev, [key]: value }));
@@ -766,24 +960,32 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const requestDelete = (id: string) => {
     setTableError(null);
-    const confirmed = window.confirm("Delete this row?");
-    if (!confirmed) return;
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    setDeleteInFlightId(pendingDeleteId);
 
     try {
-      const response = await fetch(`/api/dashboard/tables/${config.table}/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/dashboard/tables/${config.table}/${pendingDeleteId}`, { method: "DELETE" });
       const json = (await response.json()) as { error?: string };
       if (!response.ok) {
         throw new Error(json.error ?? "Delete failed.");
       }
-      setRows((prev) => prev.filter((row) => String(row.id ?? "") !== id));
+      setRows((prev) => prev.filter((row) => String(row.id ?? "") !== pendingDeleteId));
+      setPendingDeleteId(null);
     } catch (err) {
       setTableError(err instanceof Error ? err.message : "Delete failed.");
+    } finally {
+      setDeleteInFlightId((current) => (current === pendingDeleteId ? null : current));
     }
   };
 
-  const updateRowStatus = async (id: string, newStatus: string) => {
+  const updateRowStatus = async (id: string, newStatus: RegistrationStatusValue): Promise<boolean> => {
+    setStatusUpdateInFlightId(id);
     try {
       const response = await fetch(`/api/dashboard/tables/${config.table}/${id}`, {
         method: "PATCH",
@@ -796,8 +998,73 @@ export function DashboardTableManager({ config, initialRows }: Props) {
       if (json.data) {
         setRows((prev) => prev.map((row) => (String(row.id ?? "") === id ? (json.data as Record<string, unknown>) : row)));
       }
+      return true;
     } catch (err) {
       setTableError(err instanceof Error ? err.message : "Update failed");
+      return false;
+    } finally {
+      setStatusUpdateInFlightId((current) => (current === id ? null : current));
+    }
+  };
+
+  const updateContactMessageStatus = async (
+    id: string,
+    newStatus: ContactMessageStatusValue
+  ): Promise<boolean> => {
+    setStatusUpdateInFlightId(id);
+    try {
+      const payload: Record<string, unknown> = { status: newStatus };
+      if (newStatus === "replied") {
+        payload.replied_at = new Date().toISOString();
+      }
+
+      const response = await fetch(`/api/dashboard/tables/${config.table}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = (await response.json()) as { data?: Record<string, unknown>; error?: string };
+      if (!response.ok) throw new Error(json.error ?? "Update failed");
+
+      if (json.data) {
+        setRows((prev) =>
+          prev.map((row) => (String(row.id ?? "") === id ? (json.data as Record<string, unknown>) : row))
+        );
+      }
+      return true;
+    } catch (err) {
+      setTableError(err instanceof Error ? err.message : "Update failed");
+      return false;
+    } finally {
+      setStatusUpdateInFlightId((current) => (current === id ? null : current));
+    }
+  };
+
+  const requestStatusChange = (
+    rowId: string,
+    kind: "registration" | "contact",
+    currentStatus: RegistrationStatusValue | ContactMessageStatusValue,
+    nextStatus: RegistrationStatusValue | ContactMessageStatusValue
+  ) => {
+    if (nextStatus === currentStatus) return;
+    setTableError(null);
+    setPendingStatusChange({ rowId, kind, currentStatus, nextStatus });
+  };
+
+  const confirmStatusChange = async () => {
+    if (!pendingStatusChange) return;
+    const success =
+      pendingStatusChange.kind === "registration"
+        ? await updateRowStatus(
+            pendingStatusChange.rowId,
+            pendingStatusChange.nextStatus as RegistrationStatusValue
+          )
+        : await updateContactMessageStatus(
+            pendingStatusChange.rowId,
+            pendingStatusChange.nextStatus as ContactMessageStatusValue
+          );
+    if (success) {
+      setPendingStatusChange(null);
     }
   };
 
@@ -1047,10 +1314,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     doc.save(`Registration_${row.nom_complet || "Record"}.pdf`);
   };
 
-  const handlePanelSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (panelMode === "view") return;
-
+  const runPanelSubmit = async (): Promise<boolean> => {
     setIsSaving(true);
     setPanelError(null);
     setTableError(null);
@@ -1094,10 +1358,25 @@ export function DashboardTableManager({ config, initialRows }: Props) {
       setPanelOpen(false);
       setActiveRowId(null);
       resetPanelForm();
+      return true;
     } catch (err) {
       setPanelError(err instanceof Error ? err.message : "Save failed.");
+      return false;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePanelSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (panelMode === "view") return;
+    setPendingPanelSubmit(true);
+  };
+
+  const confirmPanelSubmit = async () => {
+    const success = await runPanelSubmit();
+    if (success) {
+      setPendingPanelSubmit(false);
     }
   };
 
@@ -1112,6 +1391,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   const handlePanelOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setActiveRowId(null);
+      setPendingPanelSubmit(false);
       resetPanelForm();
     }
     setPanelOpen(nextOpen);
@@ -1293,9 +1573,14 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     }
 
     if (field.type === "select" && field.options?.length) {
+      const stringValue = String(value ?? "");
+      const selectOptions =
+        stringValue && !field.options.includes(stringValue)
+          ? [stringValue, ...field.options]
+          : field.options;
       return (
         <Select
-          value={String(value ?? "")}
+          value={stringValue}
           onValueChange={(nextValue) => updateValue(field.key, nextValue)}
           disabled={panelReadonly}
         >
@@ -1303,9 +1588,9 @@ export function DashboardTableManager({ config, initialRows }: Props) {
             <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
           </SelectTrigger>
           <SelectContent>
-            {field.options.map((option) => (
+            {selectOptions.map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {field.key === "programme_inscription" ? formatProgramOptionLabel(option) : option}
               </SelectItem>
             ))}
           </SelectContent>
@@ -1470,6 +1755,31 @@ export function DashboardTableManager({ config, initialRows }: Props) {
               <div className="hidden text-sm text-muted-foreground md:block">
                 {filteredRows.length} of {rows.length} rows
               </div>
+              {isContactMessagesTable ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showOnlyNewMessages ? "default" : "outline"}
+                  onClick={() => setShowOnlyNewMessages((prev) => !prev)}
+                  className={cn(
+                    "h-9 gap-2",
+                    showOnlyNewMessages
+                      ? "bg-black text-white hover:bg-zinc-800"
+                      : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block size-2 rounded-full",
+                      newMessagesCount > 0 ? "animate-pulse bg-emerald-400" : "bg-zinc-400"
+                    )}
+                  />
+                  New Messages
+                  <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold">
+                    {newMessagesCount}
+                  </span>
+                </Button>
+              ) : null}
               <Button type="button" variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
                 <RefreshCwIcon className="mr-1 size-4" />
                 {isRefreshing ? "Refreshing..." : "Refresh"}
@@ -1560,7 +1870,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                             <PencilIcon className="mr-1 size-4" />
                             Edit
                           </Button>
-                          <Button type="button" size="sm" variant="outline" onClick={() => handleDelete(id)}>
+                          <Button type="button" size="sm" variant="outline" onClick={() => requestDelete(id)}>
                             <Trash2Icon className="mr-1 size-4" />
                             Delete
                           </Button>
@@ -1599,41 +1909,85 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                 ) : (
                   filteredRows.map((row) => {
                     const id = String(row.id ?? "");
+                    const rowStatus = normalizeRegistrationStatus(row.statut);
+                    const isStatusUpdating = statusUpdateInFlightId === id;
                     return (
                       <TableRow key={id}>
                         {listColumns.map((column) => (
-                          <TableCell key={`${id}-${column}`} className="max-w-[220px] truncate">
-                            {column === "registration_id" && !row[column] 
-                              ? getRegistrationIdFallback(row)
-                              : column === "categorie_age" && !row[column]
-                              ? getCategoryFallback(row.age)
-                              : formatValue(row[column])}
+                          <TableCell
+                            key={`${id}-${column}`}
+                            className={cn(
+                              "max-w-[220px] truncate",
+                              column === "statut" && isRegistrationTable && "max-w-none overflow-visible whitespace-nowrap"
+                            )}
+                          >
+                            {column === "statut" && isRegistrationTable ? (
+                              <div className="space-y-2">
+                                <select
+                                  aria-label="Change registration status"
+                                  value={rowStatus}
+                                  disabled={isStatusUpdating || isAnyConfirmationOpen}
+                                  onChange={(event) =>
+                                    requestStatusChange(
+                                      id,
+                                      "registration",
+                                      rowStatus,
+                                      normalizeRegistrationStatus(event.target.value)
+                                    )
+                                  }
+                                  className={cn(
+                                    "w-[168px] rounded-lg border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide outline-none transition",
+                                    "focus:ring-2 focus:ring-black/20",
+                                    (isStatusUpdating || isAnyConfirmationOpen) && "cursor-not-allowed opacity-70",
+                                    getRegistrationStatusStyles(normalizeRegistrationStatus(row.statut))
+                                  )}
+                                >
+                                  <option value="en_attente">Pending</option>
+                                  <option value="accepte">Accepted</option>
+                                  <option value="refuse">Not Accepted</option>
+                                </select>
+                              </div>
+                            ) : column === "status" && isContactMessagesTable ? (
+                              <div className="flex items-center gap-2">
+                                {normalizeContactMessageStatus(row.status) === "new" ? (
+                                  <span className="inline-block size-2 rounded-full bg-emerald-400 animate-pulse" />
+                                ) : null}
+                                <select
+                                  aria-label="Change contact message status"
+                                  value={normalizeContactMessageStatus(row.status)}
+                                  disabled={isStatusUpdating || isAnyConfirmationOpen}
+                                  onChange={(event) =>
+                                    requestStatusChange(
+                                      id,
+                                      "contact",
+                                      normalizeContactMessageStatus(row.status),
+                                      normalizeContactMessageStatus(event.target.value)
+                                    )
+                                  }
+                                  className={cn(
+                                    "w-[168px] rounded-lg border px-3 py-1.5 text-sm font-semibold outline-none transition",
+                                    "focus:ring-2 focus:ring-black/20",
+                                    (isStatusUpdating || isAnyConfirmationOpen) && "cursor-not-allowed opacity-70",
+                                    getContactStatusStyles(normalizeContactMessageStatus(row.status))
+                                  )}
+                                >
+                                  <option value="new">New</option>
+                                  <option value="in_progress">In Progress</option>
+                                  <option value="replied">Replied</option>
+                                  <option value="closed">Closed</option>
+                                </select>
+                              </div>
+                            ) : column === "registration_id" && !row[column] ? (
+                              getRegistrationIdFallback(row)
+                            ) : column === "categorie_age" && !row[column] ? (
+                              getCategoryFallback(row.age)
+                            ) : (
+                              formatValue(row[column])
+                            )}
                           </TableCell>
                         ))}
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {config.table === "inscriptions_joueurs" && row.statut === "en_attente" && (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                                  onClick={() => updateRowStatus(id, "accepte")}
-                                >
-                                  <CheckIcon className="size-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                                  onClick={() => updateRowStatus(id, "refuse")}
-                                >
-                                  <XIcon className="size-4" />
-                                </Button>
-                              </>
-                            )}
                             {config.table === "inscriptions_joueurs" && (
                               <Button
                                 type="button"
@@ -1655,11 +2009,13 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                               <EyeIcon className="mr-1 size-4" />
                               View
                             </Button>
-                            <Button type="button" size="sm" variant="ghost" onClick={() => openEditPanel(row)}>
-                              <PencilIcon className="mr-1 size-4" />
-                              Edit
-                            </Button>
-                            <Button type="button" size="sm" variant="ghost" onClick={() => handleDelete(id)}>
+                            {!isContactMessagesTable ? (
+                              <Button type="button" size="sm" variant="ghost" onClick={() => openEditPanel(row)}>
+                                <PencilIcon className="mr-1 size-4" />
+                                Edit
+                              </Button>
+                            ) : null}
+                            <Button type="button" size="sm" variant="ghost" onClick={() => requestDelete(id)}>
                               <Trash2Icon className="mr-1 size-4" />
                               Delete
                             </Button>
@@ -1798,6 +2154,126 @@ export function DashboardTableManager({ config, initialRows }: Props) {
           </form>
         </SheetContent>
       </Sheet>
+
+      {pendingStatusChange ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/35 backdrop-blur-sm"
+            onClick={() => {
+              if (statusUpdateInFlightId) return;
+              setPendingStatusChange(null);
+            }}
+          />
+          <div className="relative z-[121] w-full max-w-md rounded-2xl border border-zinc-300 bg-white p-5 shadow-2xl">
+            <h3 className="text-base font-semibold text-zinc-900">Confirm Status Change</h3>
+            <p className="mt-2 text-sm text-zinc-700">
+              Are you sure you want to change this status to{" "}
+              <span className="font-semibold">
+                {pendingStatusChange.kind === "registration"
+                  ? getRegistrationStatusLabel(
+                      pendingStatusChange.nextStatus as RegistrationStatusValue
+                    )
+                  : getContactMessageStatusLabel(
+                      pendingStatusChange.nextStatus as ContactMessageStatusValue
+                    )}
+              </span>
+              ?
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={confirmStatusChange}
+                disabled={statusUpdateInFlightId === pendingStatusChange.rowId}
+                className="rounded-md bg-black px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {statusUpdateInFlightId === pendingStatusChange.rowId ? "Saving..." : "Yes"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingStatusChange(null)}
+                disabled={statusUpdateInFlightId === pendingStatusChange.rowId}
+                className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingDeleteId ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/35 backdrop-blur-sm"
+            onClick={() => {
+              if (deleteInFlightId) return;
+              setPendingDeleteId(null);
+            }}
+          />
+          <div className="relative z-[121] w-full max-w-md rounded-2xl border border-zinc-300 bg-white p-5 shadow-2xl">
+            <h3 className="text-base font-semibold text-zinc-900">Confirm Delete</h3>
+            <p className="mt-2 text-sm text-zinc-700">
+              Are you sure you want to delete this item? This action cannot be undone.
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleteInFlightId === pendingDeleteId}
+                className="rounded-md bg-black px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deleteInFlightId === pendingDeleteId ? "Deleting..." : "Yes"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingDeleteId(null)}
+                disabled={deleteInFlightId === pendingDeleteId}
+                className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingPanelSubmit ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/35 backdrop-blur-sm"
+            onClick={() => {
+              if (isSaving) return;
+              setPendingPanelSubmit(false);
+            }}
+          />
+          <div className="relative z-[121] w-full max-w-md rounded-2xl border border-zinc-300 bg-white p-5 shadow-2xl">
+            <h3 className="text-base font-semibold text-zinc-900">Confirm Changes</h3>
+            <p className="mt-2 text-sm text-zinc-700">
+              {panelMode === "create"
+                ? "Are you sure you want to create this item?"
+                : "Are you sure you want to save these changes?"}
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={confirmPanelSubmit}
+                disabled={isSaving}
+                className="rounded-md bg-black px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSaving ? "Saving..." : "Yes"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingPanelSubmit(false)}
+                disabled={isSaving}
+                className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
