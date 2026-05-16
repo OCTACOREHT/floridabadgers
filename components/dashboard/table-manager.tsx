@@ -15,6 +15,7 @@ import {
   DownloadIcon,
   CheckIcon,
   XIcon,
+  MailIcon,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -87,6 +88,15 @@ function formatColumnLabel(value: string): string {
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
+}
+
+function isValidEmailAddress(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getRowStringValue(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  return typeof value === "string" ? value.trim() : "";
 }
 
 const ARTICLE_FALLBACK_IMAGE = "/images/IMG_6281.JPG.jpeg";
@@ -482,6 +492,7 @@ export function DashboardTableManager({ config, initialRows }: Props) {
   );
   const isPlayersTable = config.table === "joueurs";
   const isArticlesTable = config.table === "actualites";
+  const isContactMessagesTable = config.table === "contact_messages";
   const visibleFields = useMemo(
     () => config.createFields.filter((field) => !(isPlayersTable && field.key === "bio")),
     [config.createFields, isPlayersTable]
@@ -788,6 +799,33 @@ export function DashboardTableManager({ config, initialRows }: Props) {
     } catch (err) {
       setTableError(err instanceof Error ? err.message : "Update failed");
     }
+  };
+
+  const openReplyDraft = (row: Record<string, unknown>) => {
+    const recipientEmail = getRowStringValue(row, "email");
+    if (!recipientEmail || !isValidEmailAddress(recipientEmail)) {
+      setTableError("This contact message does not have a valid email address.");
+      return;
+    }
+
+    const fullName = getRowStringValue(row, "full_name");
+    const rawSubject = getRowStringValue(row, "subject");
+    const replySubject = rawSubject
+      ? rawSubject.toLowerCase().startsWith("re:")
+        ? rawSubject
+        : `Re: ${rawSubject}`
+      : "Re: Florida Badgers Contact";
+    const replyBody = [
+      fullName ? `Hello ${fullName},` : "Hello,",
+      "",
+      "Thank you for contacting Florida Badgers FCA.",
+      "",
+      "Best regards,",
+      "Florida Badgers FCA Team",
+    ].join("\n");
+
+    const mailtoUrl = `mailto:${recipientEmail}?subject=${encodeURIComponent(replySubject)}&body=${encodeURIComponent(replyBody)}`;
+    window.location.href = mailtoUrl;
   };
 
   const generateRegistrationPDF = async (row: Record<string, unknown>) => {
@@ -1605,6 +1643,12 @@ export function DashboardTableManager({ config, initialRows }: Props) {
                                 onClick={() => generateRegistrationPDF(row)}
                               >
                                 <DownloadIcon className="size-4" />
+                              </Button>
+                            )}
+                            {isContactMessagesTable && (
+                              <Button type="button" size="sm" variant="ghost" onClick={() => openReplyDraft(row)}>
+                                <MailIcon className="mr-1 size-4" />
+                                Reply
                               </Button>
                             )}
                             <Button type="button" size="sm" variant="ghost" onClick={() => openViewPanel(row)}>

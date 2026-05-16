@@ -188,6 +188,27 @@ const TABLE_CONFIGS = {
       { key: "statut", label: "Status", type: "select", options: ["en_attente", "accepte", "refuse"] },
     ],
   },
+  contact_messages: {
+    table: "contact_messages",
+    label: "Contact Messages",
+    description: "Messages sent from the website contact form",
+    listColumns: ["full_name", "email", "subject", "status", "created_at"],
+    createFields: [
+      { key: "full_name", label: "Full Name", type: "text", required: true },
+      { key: "email", label: "Email", type: "email", required: true },
+      { key: "subject", label: "Subject", type: "text", required: true },
+      { key: "message", label: "Message", type: "textarea", required: true },
+      {
+        key: "status",
+        label: "Status",
+        type: "select",
+        defaultValue: "new",
+        options: ["new", "in_progress", "replied", "closed"],
+      },
+      { key: "reply_note", label: "Reply Notes", type: "textarea" },
+      { key: "replied_at", label: "Replied At", type: "datetime" },
+    ],
+  },
   matchs: {
     table: "matchs",
     label: "Matches",

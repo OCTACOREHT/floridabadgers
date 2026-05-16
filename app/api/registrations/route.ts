@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { trackSiteEvent } from "@/lib/analytics/events";
+import {
+  createClubMailerContext,
+  escapeHtml,
+  renderClubBrandedEmail,
+} from "@/lib/email/club-email";
 
 type RegistrationInput = {
   programme_inscription:
@@ -47,6 +52,13 @@ type LegacyValueSet = {
   sexe: string;
   poste_jeu: string;
   niveau_jeu: string;
+};
+
+type PersistedRegistration = {
+  id: string | number;
+  registration_id: string | null;
+  created_at: string | null;
+  statut: string | null;
 };
 
 function isRegistrationProgram(value: unknown): value is RegistrationInput["programme_inscription"] {
@@ -162,6 +174,110 @@ function buildLegacyValueCandidates(input: RegistrationInput): LegacyValueSet[] 
     },
     mapLegacyMojibake(input),
   ];
+}
+
+function formatProgramLabel(program: RegistrationInput["programme_inscription"]): string {
+  if (program === "stage_english") return "Tryout Registration";
+  return "Club Registration";
+}
+
+async function sendRegistrationEmails(params: {
+  fullName: string;
+  email: string;
+  phone: string;
+  category: string;
+  program: RegistrationInput["programme_inscription"];
+  registration: PersistedRegistration;
+}) {
+  const mailer = createClubMailerContext();
+  const reference = params.registration.registration_id || String(params.registration.id);
+  const submittedAt = params.registration.created_at
+    ? new Date(params.registration.created_at).toLocaleString("en-US")
+    : new Date().toLocaleString("en-US");
+
+  const programLabel = formatProgramLabel(params.program);
+
+  const adminText = [
+    "New registration submitted",
+    "",
+    `Registration ID: ${reference}`,
+    `Name: ${params.fullName}`,
+    `Email: ${params.email}`,
+    `Phone: ${params.phone}`,
+    `Category: ${params.category}`,
+    `Program: ${programLabel}`,
+    `Submitted At: ${submittedAt}`,
+  ].join("\n");
+
+  const adminHtml = renderClubBrandedEmail({
+    logoHtml: mailer.logoHtml,
+    bannerTitle: "Application Received",
+    bannerSubtitle: "A new player registration was submitted.",
+    greeting: "Hello Florida Badgers Team,",
+    referenceLabel: "Registration ID",
+    referenceValue: reference,
+    contentHtml: `
+      <p style="margin:0 0 14px 0;">A new registration is now available for review.</p>
+      <p style="margin:0 0 8px 0;"><strong>Player Name:</strong> ${escapeHtml(params.fullName)}</p>
+      <p style="margin:0 0 8px 0;"><strong>Email:</strong> ${escapeHtml(params.email)}</p>
+      <p style="margin:0 0 8px 0;"><strong>Phone:</strong> ${escapeHtml(params.phone)}</p>
+      <p style="margin:0 0 8px 0;"><strong>Category:</strong> ${escapeHtml(params.category)}</p>
+      <p style="margin:0 0 8px 0;"><strong>Program:</strong> ${escapeHtml(programLabel)}</p>
+      <p style="margin:0;"><strong>Submitted:</strong> ${escapeHtml(submittedAt)}</p>
+    `,
+  });
+
+  await mailer.transporter.sendMail({
+    from: mailer.fromWithName,
+    to: mailer.registrationTo,
+    replyTo: params.email,
+    subject: `New Registration - ${reference}`,
+    text: adminText,
+    html: adminHtml,
+    attachments: mailer.attachments,
+  });
+
+  const ackText = [
+    "Application Received",
+    "",
+    `Hello ${params.fullName},`,
+    "",
+    "We have successfully received your registration.",
+    `Registration ID: ${reference}`,
+    "",
+    "Our team will review your application and contact you shortly by email or phone.",
+    "",
+    "Florida Badgers FCA Team",
+  ].join("\n");
+
+  const ackHtml = renderClubBrandedEmail({
+    logoHtml: mailer.logoHtml,
+    bannerTitle: "Application Received",
+    bannerSubtitle: "Thank you for registering with Florida Badgers FCA.",
+    greeting: `Hello ${params.fullName},`,
+    referenceLabel: "Registration ID",
+    referenceValue: reference,
+    contentHtml: `
+      <p style="margin:0 0 14px 0;">
+        We have successfully received your registration for <strong>${escapeHtml(programLabel)}</strong>.
+      </p>
+      <p style="margin:0 0 8px 0;"><strong>Category:</strong> ${escapeHtml(params.category)}</p>
+      <p style="margin:0 0 8px 0;"><strong>Phone:</strong> ${escapeHtml(params.phone)}</p>
+      <p style="margin:0;"><strong>Submitted:</strong> ${escapeHtml(submittedAt)}</p>
+      <p style="margin:14px 0 0 0;">
+        Our team will review your application carefully and contact you soon for the next steps.
+      </p>
+    `,
+  });
+
+  await mailer.transporter.sendMail({
+    from: mailer.fromWithName,
+    to: params.email,
+    subject: `Registration Received - ${reference}`,
+    text: ackText,
+    html: ackHtml,
+    attachments: mailer.attachments,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -305,6 +421,19 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      try {
+        await sendRegistrationEmails({
+          fullName: normalizedFullName,
+          email: normalizeText(body.email),
+          phone: normalizeText(body.telephone),
+          category: category.nom,
+          program: body.programme_inscription,
+          registration: data as PersistedRegistration,
+        });
+      } catch (mailError) {
+        console.error("[registration-email] Failed to send registration emails", mailError);
+      }
+
       return NextResponse.json({ success: true, registration: data }, { status: 201 });
     }
 
@@ -376,6 +505,19 @@ export async function POST(request: NextRequest) {
             legacySchema: true,
           },
         });
+
+        try {
+          await sendRegistrationEmails({
+            fullName: normalizedFullName,
+            email: normalizeText(body.email),
+            phone: normalizeText(body.telephone),
+            category: category.nom,
+            program: body.programme_inscription,
+            registration: legacyInsert.data as PersistedRegistration,
+          });
+        } catch (mailError) {
+          console.error("[registration-email] Failed to send registration emails", mailError);
+        }
 
         return NextResponse.json({ success: true, registration: legacyInsert.data, legacy: true }, { status: 201 });
       }

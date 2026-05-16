@@ -25,6 +25,7 @@ import {
   UsersIcon,
   Settings2Icon,
   LayoutPanelTopIcon,
+  MailIcon,
 } from "lucide-react"
 
 const data = {
@@ -43,6 +44,11 @@ const data = {
       title: "Registrations",
       url: "/dashboard/tables/inscriptions_joueurs",
       icon: <ClipboardListIcon />,
+    },
+    {
+      title: "Contact Messages",
+      url: "/dashboard/tables/contact_messages",
+      icon: <MailIcon />,
     },
     {
       title: "Analytics",
