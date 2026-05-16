@@ -57,6 +57,14 @@ type Category = {
   description: string | null;
 };
 
+function isLegacyAgeBandCategoryName(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return (
+    /\b\d{1,2}\s*-\s*\d{1,2}\s*ans\b/.test(normalized) ||
+    /\b\d{1,2}\s*ans\s*et\s*plus\b/.test(normalized)
+  );
+}
+
 
 
 const steps = [
@@ -268,14 +276,18 @@ export default function JoinPage() {
   }, []);
   const isMinor = typeof age === "number" && age < 18;
   const isStageRegistration = form.programme_inscription === "stage_english";
+  const formCategories = useMemo(
+    () => categories.filter((category) => !isLegacyAgeBandCategoryName(category.nom)),
+    [categories]
+  );
   const availableCategories = useMemo(() => {
     if (isStageRegistration) {
-      return categories;
+      return formCategories;
     }
-    return categories.filter(
+    return formCategories.filter(
       (category) => !/(18|plus|senior)/i.test(`${category.nom} ${category.description ?? ""}`)
     );
-  }, [categories, isStageRegistration]);
+  }, [formCategories, isStageRegistration]);
   const selectedCategoryId = useMemo(() => {
     if (availableCategories.length === 0) return "";
     return availableCategories.some((category) => category.id === form.categorie_id)
@@ -283,12 +295,12 @@ export default function JoinPage() {
       : availableCategories[0].id;
   }, [availableCategories, form.categorie_id]);
   const stageAutoCategory = useMemo(() => {
-    if (!age || !isStageRegistration || categories.length === 0) {
+    if (!age || !isStageRegistration || formCategories.length === 0) {
       return null;
     }
 
     const matchByPattern = (pattern: RegExp) =>
-      categories.find((category) => pattern.test(`${category.nom} ${category.description ?? ""}`));
+      formCategories.find((category) => pattern.test(`${category.nom} ${category.description ?? ""}`));
 
     if (age <= 5) return matchByPattern(/u5|\b5\b/i) ?? null;
     if (age <= 7) return matchByPattern(/u7|\b6\b|\b7\b/i) ?? null;
@@ -298,14 +310,16 @@ export default function JoinPage() {
     if (age <= 15) return matchByPattern(/u15|\b14\b|\b15\b/i) ?? null;
     if (age <= 17) return matchByPattern(/u17|\b16\b|\b17\b/i) ?? null;
     return matchByPattern(/18|senior|plus|adult/i) ?? null;
-  }, [age, categories, isStageRegistration]);
+  }, [age, formCategories, isStageRegistration]);
   const resolvedCategoryId = isStageRegistration
     ? stageAutoCategory?.id ?? selectedCategoryId
     : selectedCategoryId;
   const resolvedCategoryLabel = useMemo(() => {
-    const found = categories.find((category) => category.id === resolvedCategoryId);
+    const found =
+      formCategories.find((category) => category.id === resolvedCategoryId) ??
+      categories.find((category) => category.id === resolvedCategoryId);
     return found?.nom ?? "-";
-  }, [categories, resolvedCategoryId]);
+  }, [categories, formCategories, resolvedCategoryId]);
   const displaySteps = useMemo(
     () =>
       steps.map((item, index) => {
@@ -331,10 +345,13 @@ export default function JoinPage() {
           throw new Error(payload.error ?? "Unable to load categories");
         }
         const loadedCategories = payload.data;
+        const filteredCategories = loadedCategories.filter(
+          (category) => !isLegacyAgeBandCategoryName(category.nom)
+        );
         if (active) {
           setCategories(loadedCategories);
-          if (loadedCategories.length > 0) {
-            setForm((prev) => ({ ...prev, categorie_id: prev.categorie_id || loadedCategories[0].id }));
+          if (filteredCategories.length > 0) {
+            setForm((prev) => ({ ...prev, categorie_id: prev.categorie_id || filteredCategories[0].id }));
           }
         }
       } catch (error) {
