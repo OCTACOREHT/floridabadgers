@@ -1,21 +1,16 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { 
-  CheckIcon, 
-  ChevronsUpDownIcon, 
-  BanknoteIcon, 
-  CalendarIcon, 
-  UserIcon, 
-  Loader2Icon,
-  ZapIcon,
-  WalletIcon,
-  SmartphoneIcon,
+import { useMemo, useState } from "react";
+import {
+  CheckIcon,
+  ChevronsUpDownIcon,
   CoinsIcon,
+  CreditCardIcon,
+  Loader2Icon,
   ReceiptIcon,
-  HistoryIcon,
-  SearchIcon,
-  CreditCardIcon
+  UserIcon,
+  WalletIcon,
+  ZapIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,12 +22,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Card, CardContent } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
@@ -48,15 +38,60 @@ interface QuickPaymentFormProps {
   players: Player[];
 }
 
+type FeeType = "monthly" | "registration" | "equipment" | "other";
+type AmountPresetId =
+  | "monthly"
+  | "registration"
+  | "registration_monthly_bundle"
+  | "equipment"
+  | "other";
+
+type AmountPreset = {
+  id: AmountPresetId;
+  label: string;
+  subtitle: string;
+  fixedAmount: number | null;
+};
+
+type PaymentMethod = {
+  id: "zelle" | "cash" | "transfer" | "card";
+  label: string;
+  icon: React.ReactNode;
+};
+
+type PaymentLine = {
+  type: FeeType;
+  amount: number;
+  label: string;
+};
+
+const AMOUNT_PRESETS: AmountPreset[] = [
+  { id: "monthly", label: "Monthly", subtitle: "$50", fixedAmount: 50 },
+  { id: "registration", label: "Registration", subtitle: "$150", fixedAmount: 150 },
+  { id: "registration_monthly_bundle", label: "Reg + Monthly", subtitle: "$200", fixedAmount: 200 },
+  { id: "equipment", label: "Equipment", subtitle: "$100", fixedAmount: 100 },
+  { id: "other", label: "Other Amount", subtitle: "Custom", fixedAmount: null },
+];
+
+const PAYMENT_METHODS: PaymentMethod[] = [
+  { id: "zelle", label: "Zelle", icon: <ZapIcon className="h-4 w-4" /> },
+  { id: "cash", label: "Cash", icon: <CoinsIcon className="h-4 w-4" /> },
+  { id: "transfer", label: "Bank", icon: <WalletIcon className="h-4 w-4" /> },
+  { id: "card", label: "Card", icon: <CreditCardIcon className="h-4 w-4" /> },
+];
+
+function formatMoney(value: number): string {
+  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export default function QuickPaymentForm({ players }: QuickPaymentFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
-  const [amount, setAmount] = useState("50");
-  const [feeType, setFeeType] = useState("monthly");
-  const [method, setMethod] = useState("zelle");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState<AmountPresetId>("monthly");
+  const [customAmount, setCustomAmount] = useState("50");
+  const [method, setMethod] = useState<PaymentMethod["id"]>("zelle");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,24 +100,68 @@ export default function QuickPaymentForm({ players }: QuickPaymentFormProps) {
     [players, selectedPlayerId]
   );
 
-  const quickAmounts = [
-    { label: "Monthly", value: "50", type: "monthly" },
-    { label: "Registration", value: "150", type: "registration" },
-    { label: "Equipment", value: "100", type: "equipment" },
-    { label: "Other", value: "", type: "other" },
-  ];
+  const selectedPreset = useMemo(
+    () => AMOUNT_PRESETS.find((preset) => preset.id === selectedPresetId) ?? AMOUNT_PRESETS[0],
+    [selectedPresetId]
+  );
 
-  const paymentMethods = [
-    { id: "zelle", label: "Zelle", icon: <ZapIcon className="h-4 w-4" /> },
-    { id: "cash", label: "Cash", icon: <CoinsIcon className="h-4 w-4" /> },
-    { id: "transfer", label: "Bank", icon: <WalletIcon className="h-4 w-4" /> },
-    { id: "card", label: "Card", icon: <CreditCardIcon className="h-4 w-4" /> },
-  ];
+  const paymentLines = useMemo<PaymentLine[]>(() => {
+    if (selectedPresetId === "registration_monthly_bundle") {
+      return [
+        { type: "registration", amount: 150, label: "Registration Fee" },
+        { type: "monthly", amount: 50, label: "Monthly Fee" },
+      ];
+    }
+
+    if (selectedPresetId === "registration") {
+      return [{ type: "registration", amount: 150, label: "Registration Fee" }];
+    }
+
+    if (selectedPresetId === "equipment") {
+      return [{ type: "equipment", amount: 100, label: "Equipment Fee" }];
+    }
+
+    if (selectedPresetId === "other") {
+      const parsed = Number(customAmount);
+      const safeAmount = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+      return [{ type: "other", amount: safeAmount, label: "Custom Payment" }];
+    }
+
+    return [{ type: "monthly", amount: 50, label: "Monthly Fee" }];
+  }, [customAmount, selectedPresetId]);
+
+  const totalAmount = useMemo(
+    () => paymentLines.reduce((sum, line) => sum + line.amount, 0),
+    [paymentLines]
+  );
+
+  const isBundlePayment = selectedPresetId === "registration_monthly_bundle";
+  const isCustomPreset = selectedPresetId === "other";
+  const selectedMethod = PAYMENT_METHODS.find((entry) => entry.id === method);
+
+  const handleSelectPreset = (presetId: AmountPresetId) => {
+    setSelectedPresetId(presetId);
+    const preset = AMOUNT_PRESETS.find((entry) => entry.id === presetId);
+    if (preset?.fixedAmount !== null && preset?.fixedAmount !== undefined) {
+      setCustomAmount(String(preset.fixedAmount));
+    }
+  };
+
+  const buildLineNotes = (line: PaymentLine, index: number, totalLines: number) => {
+    if (totalLines <= 1) return "";
+    return `Bundle payment (${index + 1}/${totalLines}) - ${line.label}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!selectedPlayerId) {
-      setError("Select player first");
+      setError("Please select a player first.");
+      return;
+    }
+
+    if (totalAmount <= 0) {
+      setError("Amount must be greater than $0.");
       return;
     }
 
@@ -90,85 +169,103 @@ export default function QuickPaymentForm({ players }: QuickPaymentFormProps) {
     setError(null);
 
     try {
-      const response = await fetch("/api/dashboard/tables/paiements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          joueur_id: selectedPlayerId,
-          montant: Number(amount),
-          type_frais: feeType,
-          methode_paiement: method,
-          date_paiement: date,
-          statut: "paid",
-          notes: notes,
-        }),
-      });
+      for (let index = 0; index < paymentLines.length; index += 1) {
+        const line = paymentLines[index];
+        const response = await fetch("/api/dashboard/tables/paiements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // Keep a lightweight auto-note only for combined (bundle) payments.
+          body: JSON.stringify({
+            joueur_id: selectedPlayerId,
+            montant: Number(line.amount),
+            type_frais: line.type,
+            methode_paiement: method,
+            date_paiement: date,
+            statut: "paid",
+            notes: buildLineNotes(line, index, paymentLines.length) || null,
+          }),
+        });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed");
+        if (!response.ok) {
+          const data = (await response.json()) as { error?: string };
+          throw new Error(data.error ?? `Failed to save ${line.label}.`);
+        }
       }
 
-      router.push("/dashboard/finance?success=1");
+      router.push(`/dashboard/finance?success=1&entries=${paymentLines.length}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error");
+      setError(err instanceof Error ? err.message : "Unexpected error.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] bg-[#F5F5F5] text-[#050505] rounded-xl overflow-hidden shadow-xl border border-[#D9D9D9]">
-      {/* POS Header Compact */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#050505] text-white">
-        <div className="flex items-center gap-2">
-          <ReceiptIcon className="h-5 w-5 text-[#D9D9D9]" />
-          <h2 className="text-sm font-bold tracking-tighter">FINANCE TERMINAL</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="flex h-[calc(100vh-90px)] min-h-[680px] w-full max-w-none flex-col overflow-hidden border border-[#D9D9D9] bg-transparent text-[#050505]"
+    >
+      <div className="flex items-center justify-between border-b border-[#2E2424] bg-[#000000] px-4 py-2 text-white">
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-md border border-[#D9D9D9]/40 bg-[#2E2424] p-1">
+            <ReceiptIcon className="h-4 w-4 text-[#F0F0F0]" />
+          </div>
+          <div>
+            <h2 className="text-[13px] font-bold uppercase tracking-wide">Finance Terminal</h2>
+            <p className="text-[10px] text-[#D9D9D9]">Professional payment intake</p>
+          </div>
         </div>
-        <div className="text-[10px] font-mono text-[#BFC0C2] flex gap-3">
-          <span>{new Date().toLocaleDateString()}</span>
-          <span className="text-emerald-400">● ONLINE</span>
+        <div className="text-right text-[10px] text-[#D9D9D9]">
+          <div>{new Date().toLocaleDateString()}</div>
+          <div className="font-semibold text-emerald-400">ONLINE</div>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Transaction Details */}
-        <div className="flex-1 p-4 flex flex-col gap-4 border-r border-[#D9D9D9]">
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase text-[#3A3537]">Player</Label>
+      <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[1.35fr_1fr]">
+        <div className="flex min-h-0 flex-col gap-3 overflow-hidden border-r border-[#D9D9D9] p-4">
+          <div className="border border-[#D9D9D9] bg-transparent p-3">
+            <Label className="mb-1.5 block text-[10px] font-semibold uppercase text-[#2E2424]">Player</Label>
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full h-12 justify-between bg-white border-[#D9D9D9] hover:bg-[#F5F5F5] text-sm px-4"
+                  type="button"
+                  className="h-10 w-full justify-between border-[#D9D9D9] bg-transparent px-3 text-sm hover:bg-transparent"
                 >
                   <div className="flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-[#3A3537]" />
+                    <UserIcon className="h-4 w-4 text-[#2E2424]" />
                     {selectedPlayer ? (
-                      <span className="font-bold">{selectedPlayer.prenom} {selectedPlayer.nom}</span>
+                      <span className="font-semibold text-[#000000]">
+                        {selectedPlayer.prenom} {selectedPlayer.nom}
+                      </span>
                     ) : (
-                      <span className="text-muted-foreground italic">Select player...</span>
+                      <span className="italic text-[#6B7280]">Select player...</span>
                     )}
                   </div>
-                  <ChevronsUpDownIcon className="h-4 w-4 opacity-50" />
+                  <ChevronsUpDownIcon className="h-4 w-4 text-[#6B7280]" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Search name..." />
-                  <CommandList className="max-h-[300px]">
-                    <CommandEmpty>No results.</CommandEmpty>
+                  <CommandInput placeholder="Search player..." />
+                  <CommandList className="max-h-[220px]">
+                    <CommandEmpty>No player found.</CommandEmpty>
                     <CommandGroup>
-                      {players.map((p) => (
+                      {players.map((player) => (
                         <CommandItem
-                          key={p.id}
-                          className="py-2 cursor-pointer"
-                          onSelect={() => { setSelectedPlayerId(p.id); setOpen(false); }}
+                          key={player.id}
+                          className="cursor-pointer py-2"
+                          onSelect={() => {
+                            setSelectedPlayerId(player.id);
+                            setOpen(false);
+                          }}
                         >
-                          <div className="flex justify-between w-full text-sm">
-                            <span className="font-semibold">{p.prenom} {p.nom}</span>
-                            <span className="text-[10px] opacity-50">{p.categorie?.nom}</span>
+                          <div className="flex w-full items-center justify-between gap-2 text-sm">
+                            <span className="font-medium">
+                              {player.prenom} {player.nom}
+                            </span>
+                            <span className="text-[11px] text-[#6B7280]">{player.categorie?.nom}</span>
                           </div>
                         </CommandItem>
                       ))}
@@ -179,103 +276,143 @@ export default function QuickPaymentForm({ players }: QuickPaymentFormProps) {
             </Popover>
           </div>
 
-          {/* Compact Receipt Area */}
-          <div className="mt-auto bg-white rounded-lg p-5 border border-[#D9D9D9] space-y-3 shadow-inner">
-            <div className="flex justify-between text-xs border-b border-dashed pb-2">
-              <span className="text-[#3A3537]">FEE TYPE</span>
-              <span className="font-bold uppercase">{feeType}</span>
+          <div className="flex flex-1 flex-col border border-[#D9D9D9] bg-transparent p-4">
+            <div className="mb-2.5 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-[#2E2424]">Payment Summary</h3>
             </div>
-            <div className="flex justify-between text-xs border-b border-dashed pb-2">
-              <span className="text-[#3A3537]">PAYMENT METHOD</span>
-              <span className="font-bold uppercase flex items-center gap-1">
-                {paymentMethods.find(m => m.id === method)?.icon} {method}
-              </span>
+
+            <div className="space-y-1.5 border-y border-dashed border-[#D9D9D9] py-2.5 text-xs">
+              {paymentLines.map((line) => (
+                <div key={`${line.type}-${line.label}`} className="flex items-center justify-between">
+                  <span className="font-medium text-[#2E2424]">{line.label}</span>
+                  <span className="font-bold text-[#000000]">{formatMoney(line.amount)}</span>
+                </div>
+              ))}
             </div>
-            <div className="flex justify-between items-end pt-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-[#3A3537]">TOTAL AMOUNT</span>
-                <span className="text-4xl font-black font-mono leading-none">${amount}</span>
+
+            <div className="mt-auto flex items-end justify-between pt-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase text-[#6B7280]">Total Amount</p>
+                <p className="text-3xl font-black tracking-tight text-[#000000]">
+                  {formatMoney(totalAmount)}
+                </p>
               </div>
-              <div className="text-[10px] text-muted-foreground italic">Ready to process</div>
+              <div className="text-right text-[10px] text-[#6B7280]" />
             </div>
           </div>
         </div>
 
-        {/* Right: Keypad Area - Strictly no scroll */}
-        <div className="w-[380px] bg-white p-4 flex flex-col gap-4 border-l border-[#D9D9D9]">
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase text-[#3A3537]">Select Amount</Label>
+        <div className="flex min-h-0 flex-col gap-3 overflow-hidden bg-transparent p-4">
+          <div className="border border-[#D9D9D9] bg-transparent p-3">
+            <Label className="mb-1.5 block text-[10px] font-semibold uppercase text-[#2E2424]">Select Amount</Label>
             <div className="grid grid-cols-2 gap-2">
-              {quickAmounts.map((q) => (
+              {AMOUNT_PRESETS.map((preset) => (
                 <Button
-                  key={q.label}
+                  key={preset.id}
                   type="button"
                   size="sm"
-                  onClick={() => { if (q.value) setAmount(q.value); setFeeType(q.type); }}
+                  onClick={() => handleSelectPreset(preset.id)}
                   className={cn(
-                    "h-12 text-xs font-bold border",
-                    feeType === q.type 
-                      ? "bg-[#050505] text-white border-[#050505]" 
-                      : "bg-[#F5F5F5] border-[#D9D9D9] hover:bg-[#D9D9D9] text-[#3A3537]"
+                    "h-10 justify-between border px-2.5 text-[13px] font-semibold",
+                    selectedPresetId === preset.id
+                      ? "border-[#000000] bg-transparent text-[#000000] ring-1 ring-[#000000]"
+                      : "border-[#D9D9D9] bg-transparent text-[#2E2424] hover:bg-transparent"
                   )}
                 >
-                  {q.label} {q.value && `($${q.value})`}
+                  <span>{preset.label}</span>
+                  <span className="opacity-90">{preset.subtitle}</span>
                 </Button>
               ))}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase text-[#3A3537]">Method</Label>
+          <div className="border border-[#D9D9D9] bg-transparent p-3">
+            <Label className="mb-1.5 block text-[10px] font-semibold uppercase text-[#2E2424]">Method</Label>
             <div className="grid grid-cols-2 gap-2">
-              {paymentMethods.map((m) => (
+              {PAYMENT_METHODS.map((paymentMethod) => (
                 <Button
-                  key={m.id}
+                  key={paymentMethod.id}
                   type="button"
                   size="sm"
-                  onClick={() => setMethod(m.id)}
+                  onClick={() => setMethod(paymentMethod.id)}
                   className={cn(
-                    "h-12 flex items-center justify-center gap-2 border transition-all text-xs",
-                    method === m.id 
-                      ? "bg-[#3A3537] text-white border-[#3A3537]" 
-                      : "bg-[#F5F5F5] border-[#D9D9D9] hover:bg-[#D9D9D9] text-[#3A3537]"
+                    "h-10 gap-2 border text-[13px] font-semibold",
+                    method === paymentMethod.id
+                      ? "border-[#2E2424] bg-transparent text-[#2E2424] ring-1 ring-[#2E2424]"
+                      : "border-[#D9D9D9] bg-transparent text-[#2E2424] hover:bg-transparent"
                   )}
                 >
-                  {m.icon} {m.label}
+                  {paymentMethod.icon}
+                  {paymentMethod.label}
                 </Button>
               ))}
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase text-[#3A3537]">Ref / Notes</Label>
-            <Input 
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Transaction notes..."
-              className="h-9 text-xs bg-[#F5F5F5] border-[#D9D9D9]"
-            />
+          <div className="grid grid-cols-1 gap-2.5 border border-[#D9D9D9] bg-transparent p-3">
+            <div>
+              <Label className="mb-1 block text-[10px] font-semibold uppercase text-[#2E2424]">
+                Payment Date
+              </Label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-9 border-[#D9D9D9] bg-transparent text-sm"
+              />
+            </div>
+
+            <div>
+              <Label className="mb-1 block text-[10px] font-semibold uppercase text-[#2E2424]">
+                Amount
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={isCustomPreset ? customAmount : String(selectedPreset.fixedAmount ?? totalAmount)}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                disabled={!isCustomPreset}
+                className={cn(
+                  "h-9 border-[#D9D9D9] bg-transparent text-sm",
+                  !isCustomPreset && "cursor-not-allowed opacity-70"
+                )}
+              />
+            </div>
           </div>
 
-          <div className="mt-auto">
-            {error && <p className="text-[10px] text-red-600 mb-2 font-bold text-center italic">{error}</p>}
-            <Button 
-              onClick={handleSubmit}
+          <div className="mt-auto border border-[#D9D9D9] bg-transparent p-3">
+            <div className="mb-3 flex items-center justify-between text-xs text-[#6B7280]">
+              <span>Method</span>
+              <span className="flex items-center gap-1 font-semibold uppercase text-[#2E2424]">
+                {selectedMethod?.icon}
+                {selectedMethod?.label}
+              </span>
+            </div>
+
+            {error && (
+              <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                {error}
+              </p>
+            )}
+
+            <Button
+              type="submit"
               disabled={isSubmitting}
-              className="w-full h-16 text-lg font-black uppercase tracking-tighter bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg active:scale-[0.98] transition-transform"
+              className="h-12 w-full bg-emerald-600 text-sm font-black uppercase tracking-wide text-white hover:bg-emerald-500"
             >
               {isSubmitting ? (
-                <Loader2Icon className="h-6 w-6 animate-spin" />
+                <Loader2Icon className="h-5 w-5 animate-spin" />
               ) : (
-                <div className="flex items-center gap-2">
-                  <CheckIcon className="h-6 w-6 stroke-[3px]" />
-                  SUBMIT PAYMENT
-                </div>
+                <span className="flex items-center gap-2">
+                  <CheckIcon className="h-5 w-5 stroke-[3px]" />
+                  {isBundlePayment ? "Submit Bundle Payment" : "Submit Payment"}
+                </span>
               )}
             </Button>
           </div>
         </div>
       </div>
-    </div>
+    </form>
   );
 }
