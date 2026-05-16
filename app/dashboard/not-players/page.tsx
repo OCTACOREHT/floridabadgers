@@ -5,20 +5,9 @@ import {
 } from "@/lib/dashboard/tables";
 import { getAuthenticatedUserFromServerCookies } from "@/lib/auth/session";
 import { normalizeDashboardRole } from "@/lib/auth/permissions";
+import { NotPlayersTable, type NotAcceptedRow } from "@/components/dashboard/not-players-table";
 
 export const dynamic = "force-dynamic";
-
-type NotAcceptedRow = {
-  source: "Junior" | "Tryout";
-  id: string;
-  registrationId: string;
-  fullName: string;
-  age: string;
-  email: string;
-  phone: string;
-  createdAtRaw: string;
-  createdAt: string;
-};
 
 function asText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -88,49 +77,7 @@ export default async function DashboardNotPlayersPage() {
           Only not accepted registrations (Junior and Tryout).
         </p>
       </div>
-
-      <div className="rounded-xl border bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-sm">
-            <thead>
-              <tr className="border-b bg-slate-50">
-                <th className="px-4 py-3 text-left font-semibold text-slate-900">Type</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-900">Registration ID</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-900">Full Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-900">Age</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-900">Email</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-900">Phone</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-900">Created At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
-                    No not accepted players yet.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr key={`${row.source}-${row.id}`} className="border-b last:border-b-0">
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                        {row.source}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{row.registrationId}</td>
-                    <td className="px-4 py-3">{row.fullName}</td>
-                    <td className="px-4 py-3">{row.age}</td>
-                    <td className="px-4 py-3">{row.email}</td>
-                    <td className="px-4 py-3">{row.phone}</td>
-                    <td className="px-4 py-3">{row.createdAt}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <NotPlayersTable rows={rows} />
     </div>
   );
 }

@@ -2100,47 +2100,22 @@ export function DashboardTableManager({ config, initialRows, currentUser }: Prop
         </div>
       </div>
 
-      <Card
-        className={cn(
-          isPaymentsTable ? "border-border/70 bg-card shadow-sm" : "border-[#D9D9D9] shadow-md overflow-hidden"
-        )}
-      >
-        <CardHeader
-          className={cn(
-            isPaymentsTable ? "py-6" : "bg-zinc-50 border-b border-zinc-100 py-6"
-          )}
-        >
+      <Card className="border-border/70 bg-card shadow-sm overflow-hidden">
+        <CardHeader className="py-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative w-full max-w-xl">
-              <SearchIcon
-                className={cn(
-                  "pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2",
-                  isPaymentsTable ? "text-muted-foreground" : "text-zinc-400"
-                )}
-              />
+              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder={`Search ${config.label.toLowerCase()}...`}
                 aria-label={`Search ${config.label}`}
-                className={cn(
-                  isPaymentsTable
-                    ? "h-10 pl-9"
-                    : "h-11 pl-10 border-zinc-200 focus:border-[#050505] transition-all rounded-xl shadow-none bg-white"
-                )}
+                className="h-10 pl-9"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div
-                className={cn(
-                  isPaymentsTable
-                    ? "hidden text-sm text-muted-foreground md:block"
-                    : "hidden text-[10px] font-black uppercase text-zinc-400 tracking-widest lg:block"
-                )}
-              >
-                {isPaymentsTable
-                  ? `${filteredRows.length} of ${rows.length} rows`
-                  : `${filteredRows.length} / ${rows.length} records`}
+              <div className="hidden text-sm text-muted-foreground md:block">
+                {filteredRows.length} of {rows.length} rows
               </div>
               {isContactMessagesTable ? (
                 <Button
@@ -2173,26 +2148,20 @@ export function DashboardTableManager({ config, initialRows, currentUser }: Prop
                 size="sm"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className={cn(
-                  isPaymentsTable ? "" : "h-9 rounded-lg border-zinc-300 font-bold text-xs uppercase tracking-tight"
-                )}
+                className="h-9"
               >
                 <RefreshCwIcon className={cn("mr-1.5 size-3.5", isRefreshing && "animate-spin")} />
-                {isRefreshing ? (isPaymentsTable ? "Refreshing..." : "...") : "Refresh"}
+                {isRefreshing ? "Refreshing..." : "Refresh"}
               </Button>
               {canAdd && (
                 <Button
                   type="button"
                   size="sm"
                   onClick={openCreatePanel}
-                  className={cn(
-                    isPaymentsTable
-                      ? ""
-                      : "h-9 rounded-lg bg-[#050505] text-white font-black text-xs uppercase tracking-widest shadow-sm hover:bg-zinc-800"
-                  )}
+                  className="h-9"
                 >
                   <PlusIcon className="mr-1.5 size-3.5" />
-                  {isPaymentsTable ? "Create" : "New Entry"}
+                  Create
                 </Button>
               )}
             </div>
@@ -2289,29 +2258,19 @@ export function DashboardTableManager({ config, initialRows, currentUser }: Prop
               </div>
             )
           ) : (
-            <Table className={cn(isPaymentsTable ? "" : "border-collapse")}>
+            <Table>
               <TableHeader>
-                <tr className={cn(isPaymentsTable ? "border-b bg-muted/50" : "border-b bg-zinc-50/50")}>
+                <tr className="border-b bg-muted/50">
                   {listColumns.map((column) => (
                     <th
                       key={column}
-                      className={cn(
-                        "px-4 py-4 text-left",
-                        isPaymentsTable
-                          ? "font-medium text-muted-foreground"
-                          : "font-black uppercase text-[10px] text-zinc-500 tracking-widest"
-                      )}
+                      className="px-4 py-4 text-left font-medium text-muted-foreground"
                     >
                       {fieldLabelByKey[column] ?? formatColumnLabel(column)}
                     </th>
                   ))}
                   <th
-                    className={cn(
-                      "px-4 py-4 text-right",
-                      isPaymentsTable
-                        ? "font-medium text-muted-foreground"
-                        : "font-black uppercase text-[10px] text-zinc-500 tracking-widest"
-                    )}
+                    className="px-4 py-4 text-right font-medium text-muted-foreground"
                   >
                     Actions
                   </th>
@@ -2319,29 +2278,21 @@ export function DashboardTableManager({ config, initialRows, currentUser }: Prop
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
-                  <tr className={cn(isPaymentsTable ? "" : "border-b bg-zinc-50/50")}>
+                  <tr>
                     <TableCell
                       colSpan={listColumns.length + 1}
-                      className={cn(
-                        "py-8 text-center",
-                        isPaymentsTable ? "text-muted-foreground" : "text-zinc-400 italic font-medium"
-                      )}
+                      className="py-8 text-center text-muted-foreground"
                     >
-                      {isPaymentsTable ? "No rows found." : "No records found in this table."}
+                      No rows found.
                     </TableCell>
                   </tr>
                 ) : filteredRows.length === 0 ? (
-                  <tr className={cn(isPaymentsTable ? "" : "border-b bg-zinc-50/50")}>
+                  <tr>
                     <TableCell
                       colSpan={listColumns.length + 1}
-                      className={cn(
-                        "py-8 text-center",
-                        isPaymentsTable ? "text-muted-foreground" : "text-zinc-400 italic font-medium"
-                      )}
+                      className="py-8 text-center text-muted-foreground"
                     >
-                      {isPaymentsTable
-                        ? `No matching rows found.`
-                        : `No matching records found for "${searchTerm}".`}
+                      No matching rows found.
                     </TableCell>
                   </tr>
                 ) : (
@@ -2354,7 +2305,7 @@ export function DashboardTableManager({ config, initialRows, currentUser }: Prop
                         key={id}
                         className={cn(
                           "transition-colors group border-b",
-                          isPaymentsTable ? "hover:bg-muted/30" : "hover:bg-zinc-50/50 border-zinc-100"
+                          "hover:bg-muted/30"
                         )}
                       >
                         {listColumns.map((column) => (
