@@ -685,30 +685,34 @@ export function DashboardTableManager({ config, initialRows, currentUser }: Prop
   const [statusUpdateInFlightId, setStatusUpdateInFlightId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleteInFlightId, setDeleteInFlightId] = useState<string | null>(null);
-  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-
-  useEffect(() => {
-    if (!searchParams) return;
-    const id = searchParams.get("id");
-    const mode = searchParams.get("mode") as PanelMode | null;
-    
-    if (id && rows.length > 0) {
-      const row = rows.find(r => r.id === id || r.user_id === id);
-      if (row) {
-        if (mode === "edit") openEditPanel(row);
-        else openViewPanel(row);
-      }
-    }
-  }, [searchParams, rows.length]);
   const [pendingPanelSubmit, setPendingPanelSubmit] = useState(false);
   const [showOnlyNewMessages, setShowOnlyNewMessages] = useState(false);
+  const initialPanelTarget = (() => {
+    if (typeof window === "undefined") return null;
 
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [panelMode, setPanelMode] = useState<PanelMode>("create");
-  const [panelValues, setPanelValues] = useState<Record<string, unknown>>(() => buildInitialForm(config));
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (!id) return null;
+
+    const mode: PanelMode = params.get("mode") === "edit" ? "edit" : "view";
+    const row = initialRows.find((candidate) => candidate.id === id || candidate.user_id === id);
+    if (!row) return null;
+
+    return { mode, row };
+  })();
+
+  const [panelOpen, setPanelOpen] = useState(Boolean(initialPanelTarget));
+  const [panelMode, setPanelMode] = useState<PanelMode>(initialPanelTarget?.mode ?? "create");
+  const [panelValues, setPanelValues] = useState<Record<string, unknown>>(() =>
+    initialPanelTarget ? buildFormFromRow(config, initialPanelTarget.row) : buildInitialForm(config)
+  );
   const [panelError, setPanelError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const [activeRowId, setActiveRowId] = useState<string | null>(() => {
+    if (!initialPanelTarget) return null;
+    const id = String(initialPanelTarget.row.id ?? "").trim();
+    return id || null;
+  });
   const [draggingPhotoField, setDraggingPhotoField] = useState<string | null>(null);
   const [photoFileNames, setPhotoFileNames] = useState<Record<string, string>>({});
   const [photoFiles, setPhotoFiles] = useState<Record<string, File>>({});

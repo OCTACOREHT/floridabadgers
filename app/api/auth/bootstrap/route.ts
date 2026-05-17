@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { createSupabaseServiceClient } from "@/lib/supabase/server"
 import { rateLimit } from "@/lib/security/rate-limit"
+import { rejectCrossSiteRequest } from "@/lib/security/http-guard"
 
 type BootstrapBody = {
   email?: unknown
@@ -46,6 +47,9 @@ function getClientIp(request: NextRequest): string {
 }
 
 export async function POST(request: NextRequest) {
+  const crossSiteResponse = rejectCrossSiteRequest(request)
+  if (crossSiteResponse) return crossSiteResponse
+
   if (!isBootstrapEnabled()) {
     return NextResponse.json({ error: "Not found." }, { status: 404 })
   }

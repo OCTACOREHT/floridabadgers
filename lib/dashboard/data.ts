@@ -876,6 +876,15 @@ export async function getReportsData() {
     const playerPayments = (payments || []).filter(p => p.joueur_id === player.id);
     const totalPaid = playerPayments.reduce((acc, p) => acc + Number(p.montant), 0);
     const lastPayment = playerPayments[0]?.date_paiement || "No payment";
+    const categoryRelation = player.categorie;
+    const categoryName = (
+      categoryRelation &&
+      typeof categoryRelation === "object" &&
+      !Array.isArray(categoryRelation) &&
+      typeof (categoryRelation as { nom?: unknown }).nom === "string"
+    )
+      ? (categoryRelation as { nom: string }).nom
+      : "N/A";
     
     // Check if paid for current month (monthly fee of $50)
     const paidThisMonth = playerPayments.some(p => 
@@ -886,7 +895,7 @@ export async function getReportsData() {
     return {
       id: player.id,
       name: `${player.prenom} ${player.nom}`,
-      category: (player.categorie as any)?.nom || "N/A",
+      category: categoryName,
       dossard: player.dossard,
       totalPaid,
       lastPayment,

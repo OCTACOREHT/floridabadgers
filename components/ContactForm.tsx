@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { ArrowRight } from "lucide-react";
+import ReCAPTCHA from "react-google-recaptcha";
 
 type ContactFormState = {
   name: string;
@@ -23,6 +24,9 @@ export function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() ?? "";
 
   useEffect(() => {
     if (!successMessage) return;
@@ -42,6 +46,12 @@ export function ContactForm() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (recaptchaSiteKey && !recaptchaToken) {
+      setErrorMessage("Please complete the reCAPTCHA verification.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSuccessMessage("");
     setErrorMessage("");
@@ -50,7 +60,10 @@ export function ContactForm() {
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          recaptchaToken: recaptchaToken ?? undefined,
+        }),
       });
 
       const result = (await response.json()) as { error?: string; message?: string };
@@ -62,6 +75,8 @@ export function ContactForm() {
 
       setSuccessMessage(result.message ?? "Your message was delivered successfully. We will get back to you shortly.");
       setForm(INITIAL_STATE);
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
     } catch {
       setErrorMessage("Unable to send your message right now. Please try again.");
     } finally {
@@ -146,6 +161,18 @@ export function ContactForm() {
           {errorMessage}
         </p>
       )}
+
+      {recaptchaSiteKey ? (
+        <div className="sm:col-span-2">
+          <ReCAPTCHA
+            ref={recaptchaRef}
+            sitekey={recaptchaSiteKey}
+            onChange={(token) => setRecaptchaToken(token)}
+            onExpired={() => setRecaptchaToken(null)}
+            onErrored={() => setRecaptchaToken(null)}
+          />
+        </div>
+      ) : null}
 
       <div className="sm:col-span-2 pt-2">
         <button

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
@@ -17,7 +18,7 @@ async function checkSchema() {
   console.log('Checking columns for table "users"...');
   
   // Try to select one row including the password column
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('users')
     .select('id, full_name, password')
     .limit(1);

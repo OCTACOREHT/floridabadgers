@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthenticatedUserFromRequest, type AuthenticatedUser } from "@/lib/auth/session";
+import { rejectCrossSiteRequest } from "@/lib/security/http-guard";
 
 export async function requireApiUser(request: NextRequest): Promise<NextResponse | null> {
+  const crossSiteResponse = rejectCrossSiteRequest(request);
+  if (crossSiteResponse) return crossSiteResponse;
+
   const user = await getAuthenticatedUserFromRequest(request);
   if (user) return null;
 
@@ -22,6 +26,11 @@ type RequireApiUserResult =
   | { user: null; response: NextResponse };
 
 export async function requireApiUserWithUser(request: NextRequest): Promise<RequireApiUserResult> {
+  const crossSiteResponse = rejectCrossSiteRequest(request);
+  if (crossSiteResponse) {
+    return { user: null, response: crossSiteResponse };
+  }
+
   const user = await getAuthenticatedUserFromRequest(request);
   if (user) {
     return { user, response: null };

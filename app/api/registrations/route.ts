@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { trackSiteEvent } from "@/lib/analytics/events";
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
+import { enforceRateLimit, rejectCrossSiteRequest } from "@/lib/security/http-guard";
 import {
   createClubMailerContext,
   escapeHtml,
@@ -19,6 +21,7 @@ type RegistrationInput = {
   adresse: string;
   telephone: string;
   email: string;
+  recaptchaToken?: string | null;
   photo_url?: string | null;
   poste_jeu: "Goalkeeper" | "Defender" | "Midfielder" | "Forward" | "Gardien" | "Defenseur" | "Milieu" | "Attaquant";
   niveau_jeu: "Beginner" | "Intermediate" | "Advanced" | "Debutant" | "Intermediaire" | "Avance";
@@ -61,6 +64,44 @@ type PersistedRegistration = {
   statut: string | null;
 };
 
+type InsertErrorShape = {
+  code?: string;
+  message?: string;
+};
+
+type FlexibleInsertResult = {
+  data: PersistedRegistration | null;
+  errors: string[];
+  removedColumns: string[];
+  lastError: InsertErrorShape | null;
+};
+
+function createRequestId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+function logRegistrationIssue(
+  level: "warn" | "error",
+  requestId: string,
+  stage: string,
+  details: Record<string, unknown>
+) {
+  const entry = {
+    requestId,
+    stage,
+    ...details,
+  };
+  if (level === "warn") {
+    console.warn("[registration]", entry);
+    return;
+  }
+  console.error("[registration]", entry);
+}
+
 function isRegistrationProgram(value: unknown): value is RegistrationInput["programme_inscription"] {
   return (
     value === "junior_foundation" ||
@@ -89,6 +130,49 @@ function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeLoose(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function isLegacyCategorieAgeLabel(value: string): boolean {
+  const normalized = normalizeLoose(value);
+  return (
+    /^\d{1,2}\s*-\s*\d{1,2}\s*ans$/.test(normalized) ||
+    /^\d{1,2}\s*ans\s*et\s*plus$/.test(normalized)
+  );
+}
+
+function resolveLegacyCategorieAgeLabel(age: number, categoryName: string): string {
+  const trimmed = categoryName.trim();
+  if (trimmed && isLegacyCategorieAgeLabel(trimmed)) {
+    return trimmed;
+  }
+
+  if (age <= 10) return "8-10 ans";
+  if (age <= 13) return "11-13 ans";
+  if (age <= 17) return "14-17 ans";
+  return "18 ans et plus";
+}
+
+function buildCategorieAgeCandidates(age: number, categoryName: string): string[] {
+  const candidates = [
+    resolveLegacyCategorieAgeLabel(age, categoryName),
+    categoryName.trim(),
+  ].filter(Boolean);
+
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = candidate.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function generateRegistrationId(fullName: string): string {
   const initials = fullName
     .split(/\s+/)
@@ -106,6 +190,132 @@ function shouldFallbackToLegacy(error: { code?: string; message?: string } | nul
   if (error.code === "42703" || error.code === "23514") return true;
   const msg = (error.message ?? "").toLowerCase();
   return msg.includes("does not exist") || msg.includes("categorie_id") || msg.includes("check constraint");
+}
+
+function isMissingColumnError(error: InsertErrorShape | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes(" does not exist") ||
+    message.includes("could not find the column") ||
+    message.includes("schema cache")
+  );
+}
+
+function extractMissingColumnName(error: InsertErrorShape | null): string | null {
+  if (!error?.message) return null;
+
+  const fromPostgres = error.message.match(/column ["']?([a-zA-Z0-9_]+)["']? of relation/i);
+  if (fromPostgres?.[1]) return fromPostgres[1];
+
+  const fromPostgrest = error.message.match(/could not find the ['"]([a-zA-Z0-9_]+)['"] column/i);
+  if (fromPostgrest?.[1]) return fromPostgrest[1];
+
+  return null;
+}
+
+function toPersistedRegistrationRecord(value: unknown): PersistedRegistration | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+
+  const rawId = row.id;
+  if (typeof rawId !== "string" && typeof rawId !== "number") return null;
+
+  return {
+    id: rawId,
+    registration_id: typeof row.registration_id === "string" ? row.registration_id : null,
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    statut: typeof row.statut === "string" ? row.statut : null,
+  };
+}
+
+async function insertRegistrationFlexible(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  table: "inscriptions_joueurs" | "inscriptions_stage",
+  inputPayload: Record<string, unknown>
+): Promise<FlexibleInsertResult> {
+  const payload: Record<string, unknown> = { ...inputPayload };
+  const removedColumns: string[] = [];
+  const errors: string[] = [];
+  let lastError: InsertErrorShape | null = null;
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const insertResult = await supabase.from(table).insert(payload).select("*").single();
+    if (!insertResult.error) {
+      const normalized = toPersistedRegistrationRecord(insertResult.data);
+      if (normalized) {
+        return {
+          data: normalized,
+          errors,
+          removedColumns,
+          lastError: null,
+        };
+      }
+
+      return {
+        data: null,
+        errors: [...errors, "Insert succeeded but returned row shape is invalid."],
+        removedColumns,
+        lastError: { message: "Insert succeeded but returned row shape is invalid." },
+      };
+    }
+
+    lastError = insertResult.error;
+    errors.push(insertResult.error.message ?? "Unknown insert error.");
+
+    if (!isMissingColumnError(insertResult.error)) {
+      break;
+    }
+
+    const missingColumn = extractMissingColumnName(insertResult.error);
+    if (!missingColumn || !(missingColumn in payload)) {
+      break;
+    }
+
+    delete payload[missingColumn];
+    removedColumns.push(missingColumn);
+  }
+
+  return {
+    data: null,
+    errors,
+    removedColumns,
+    lastError,
+  };
+}
+
+function mapSchemaCanonicalValues(input: RegistrationInput): LegacyValueSet {
+  const sexeMap: Record<string, string> = {
+    Male: "Masculin",
+    Female: "Feminin",
+    Masculin: "Masculin",
+    Feminin: "Feminin",
+  };
+  const posteMap: Record<string, string> = {
+    Goalkeeper: "Gardien",
+    Defender: "Defenseur",
+    Midfielder: "Milieu",
+    Forward: "Attaquant",
+    Gardien: "Gardien",
+    Defenseur: "Defenseur",
+    Milieu: "Milieu",
+    Attaquant: "Attaquant",
+  };
+  const niveauMap: Record<string, string> = {
+    Beginner: "Debutant",
+    Intermediate: "Intermediaire",
+    Advanced: "Avance",
+    Debutant: "Debutant",
+    Intermediaire: "Intermediaire",
+    Avance: "Avance",
+  };
+
+  return {
+    sexe: sexeMap[input.sexe] || input.sexe,
+    poste_jeu: posteMap[input.poste_jeu] || input.poste_jeu,
+    niveau_jeu: niveauMap[input.niveau_jeu] || input.niveau_jeu,
+  };
 }
 
 function mapLegacyWithAccents(input: RegistrationInput): LegacyValueSet {
@@ -165,7 +375,8 @@ function mapLegacyMojibake(input: RegistrationInput): LegacyValueSet {
 }
 
 function buildLegacyValueCandidates(input: RegistrationInput): LegacyValueSet[] {
-  return [
+  const candidates = [
+    mapSchemaCanonicalValues(input),
     mapLegacyWithAccents(input),
     {
       sexe: input.sexe,
@@ -174,6 +385,14 @@ function buildLegacyValueCandidates(input: RegistrationInput): LegacyValueSet[] 
     },
     mapLegacyMojibake(input),
   ];
+
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = `${candidate.sexe}|${candidate.poste_jeu}|${candidate.niveau_jeu}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function formatProgramLabel(program: RegistrationInput["programme_inscription"]): string {
@@ -281,6 +500,30 @@ async function sendRegistrationEmails(params: {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = createRequestId();
+  const crossSiteResponse = rejectCrossSiteRequest(request);
+  if (crossSiteResponse) {
+    logRegistrationIssue("warn", requestId, "origin_guard", {
+      status: crossSiteResponse.status,
+      origin: request.headers.get("origin"),
+      host: request.headers.get("host"),
+    });
+    return crossSiteResponse;
+  }
+
+  const limiterResponse = enforceRateLimit(request, {
+    keyPrefix: "registration-form",
+    limit: 6,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (limiterResponse) {
+    logRegistrationIssue("warn", requestId, "rate_limit", {
+      status: limiterResponse.status,
+      ip: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? "unknown",
+    });
+    return limiterResponse;
+  }
+
   try {
     const body = (await request.json()) as Partial<RegistrationInput>;
 
@@ -305,6 +548,27 @@ export async function POST(request: NextRequest) {
       const value = body[field];
       if (typeof value !== "string" || !value.trim()) {
         return NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 });
+      }
+    }
+
+    const shouldEnforceRecaptcha =
+      process.env.RECAPTCHA_SECRET_KEY?.trim() &&
+      process.env.RECAPTCHA_ENFORCED !== "false";
+    if (shouldEnforceRecaptcha) {
+      const recaptcha = await verifyRecaptchaToken(normalizeText(body.recaptchaToken));
+      if (!recaptcha.success) {
+        logRegistrationIssue("warn", requestId, "recaptcha_verify", {
+          error: recaptcha.error ?? "recaptcha verification failed",
+          errorCodes: recaptcha.errorCodes ?? [],
+          hostname: recaptcha.hostname ?? null,
+        });
+        return NextResponse.json(
+          {
+            error: recaptcha.error ?? "Invalid reCAPTCHA verification.",
+            requestId,
+          },
+          { status: 400 }
+        );
       }
     }
 
@@ -358,24 +622,26 @@ export async function POST(request: NextRequest) {
 
     const normalizedFullName = normalizeText(body.nom_complet);
     const registrationId = generateRegistrationId(normalizedFullName);
-    const legacyCandidate = mapLegacyWithAccents(body as RegistrationInput);
+    const schemaCandidate = mapSchemaCanonicalValues(body as RegistrationInput);
+    const targetTable = isStageRegistration ? "inscriptions_stage" : "inscriptions_joueurs";
+    const categorieAgeCandidates = buildCategorieAgeCandidates(age, category.nom);
+    const primaryCategorieAge = categorieAgeCandidates[0] ?? category.nom;
 
-    const payload = {
+    const payloadBase = {
       programme_inscription: body.programme_inscription,
       nom_complet: normalizedFullName,
       date_naissance: body.date_naissance,
       age,
-      sexe: legacyCandidate.sexe,
+      sexe: schemaCandidate.sexe,
       adresse: normalizeText(body.adresse),
       telephone: normalizeText(body.telephone),
       email: normalizeText(body.email),
       photo_url: normalizeText(body.photo_url) || null,
-      poste_jeu: legacyCandidate.poste_jeu,
-      niveau_jeu: legacyCandidate.niveau_jeu,
+      poste_jeu: schemaCandidate.poste_jeu,
+      niveau_jeu: schemaCandidate.niveau_jeu,
       club_actuel: normalizeText(body.club_actuel) || null,
       experience_football: normalizeText(body.experience_football) || null,
       categorie_id: body.categorie_id,
-      categorie_age: category.nom, // Use the real category name (U5-U23)
       registration_id: registrationId,
       inscrit_par: isMinor ? body.inscrit_par : "joueur",
       relation_avec_joueur: isMinor ? normalizeText(body.relation_avec_joueur) || null : null,
@@ -399,16 +665,26 @@ export async function POST(request: NextRequest) {
       signature_parent_nom: normalizeText(body.signature_parent_nom) || null,
       signature_parent_date: body.signature_parent_date || null,
     };
+    const payload = isStageRegistration
+      ? payloadBase
+      : {
+        ...payloadBase,
+        // Keep backward compatibility with deployments where this column remains NOT NULL.
+        categorie_age: primaryCategorieAge,
+      };
 
-    const targetTable = isStageRegistration ? "inscriptions_stage" : "inscriptions_joueurs";
+    const modernInsert = await insertRegistrationFlexible(
+      supabase,
+      targetTable,
+      payload as Record<string, unknown>
+    );
+    const modernErrorMessage =
+      modernInsert.errors[modernInsert.errors.length - 1] ??
+      modernInsert.lastError?.message ??
+      "Unknown registration insert error.";
 
-    const { data, error } = await supabase
-      .from(targetTable)
-      .insert(payload)
-      .select("id, registration_id, created_at, statut")
-      .single();
-
-    if (!error) {
+    if (modernInsert.data) {
+      const data = modernInsert.data;
       await trackSiteEvent({
         eventType: "registration_submitted",
         path: "/join",
@@ -438,25 +714,57 @@ export async function POST(request: NextRequest) {
     }
 
     if (isStageRegistration) {
+      logRegistrationIssue("error", requestId, "stage_modern_insert_failed", {
+        errors: modernInsert.errors,
+        removedColumns: modernInsert.removedColumns,
+      });
       return NextResponse.json(
         {
           error:
-            error.message ??
+            modernErrorMessage ??
             "Tryout registration failed. Ensure the 'inscriptions_stage' table exists and migrations are applied.",
+          requestId,
+          details: {
+            modern: modernInsert.errors,
+            removedColumns: modernInsert.removedColumns,
+          },
         },
         { status: 500 }
       );
     }
 
-    if (!shouldFallbackToLegacy(error)) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!shouldFallbackToLegacy(modernInsert.lastError)) {
+      logRegistrationIssue("error", requestId, "modern_insert_failed_no_legacy_fallback", {
+        errors: modernInsert.errors,
+        removedColumns: modernInsert.removedColumns,
+      });
+      return NextResponse.json(
+        {
+          error: modernErrorMessage,
+          requestId,
+          details: {
+            modern: modernInsert.errors,
+            removedColumns: modernInsert.removedColumns,
+          },
+        },
+        { status: 500 }
+      );
     }
 
 
     const legacyCandidates = buildLegacyValueCandidates(body as RegistrationInput);
+    const legacyErrors: string[] = [];
 
     for (const candidate of legacyCandidates) {
+      const modernCompatibleFallbackPayload = {
+        ...payload,
+        sexe: candidate.sexe,
+        poste_jeu: candidate.poste_jeu,
+        niveau_jeu: candidate.niveau_jeu,
+      };
+
       const legacyPayload = {
+        programme_inscription: body.programme_inscription,
         nom_complet: normalizedFullName,
         date_naissance: body.date_naissance,
         age,
@@ -469,14 +777,22 @@ export async function POST(request: NextRequest) {
         niveau_jeu: candidate.niveau_jeu,
         club_actuel: normalizeText(body.club_actuel) || null,
         experience_football: normalizeText(body.experience_football) || null,
-        categorie_age: category.nom,
+        categorie_age: primaryCategorieAge,
         registration_id: registrationId,
+        inscrit_par: isMinor ? body.inscrit_par : "joueur",
+        relation_avec_joueur: isMinor ? normalizeText(body.relation_avec_joueur) || null : null,
         probleme_sante: Boolean(body.probleme_sante),
         probleme_sante_details: normalizeText(body.probleme_sante_details) || null,
         allergies_connues: normalizeText(body.allergies_connues) || null,
+        contact_urgence_nom: normalizeText(body.contact_urgence_nom),
+        contact_urgence_telephone: normalizeText(body.contact_urgence_telephone),
+        contact_urgence_relation: normalizeText(body.contact_urgence_relation),
+        contact_urgence_email: normalizeText(body.contact_urgence_email) || null,
+        contact_urgence_adresse: normalizeText(body.contact_urgence_adresse) || null,
         nom_parent_tuteur: parentName || null,
         telephone_parent_tuteur: parentPhone || null,
         autorisation_parentale: Boolean(body.autorisation_parentale),
+        consentement_soins_urgence: Boolean(body.consentement_soins_urgence),
         accepte_regles_stage: Boolean(body.accepte_regles_stage),
         confirme_infos_correctes: Boolean(body.confirme_infos_correctes),
         waiver_accepted: Boolean(body.waiver_accepted),
@@ -485,51 +801,106 @@ export async function POST(request: NextRequest) {
         signature_parent_nom: normalizeText(body.signature_parent_nom) || null,
         signature_parent_date: body.signature_parent_date || null,
       };
+      const modernCompatibleWithoutCategoryAge = { ...modernCompatibleFallbackPayload };
+      const legacyWithoutCategoryAge = { ...legacyPayload };
+      delete (modernCompatibleWithoutCategoryAge as Record<string, unknown>).categorie_age;
+      delete (legacyWithoutCategoryAge as Record<string, unknown>).categorie_age;
 
-      const legacyInsert = await supabase
-        .from("inscriptions_joueurs")
-        .insert(legacyPayload)
-        .select("id, registration_id, created_at, statut")
-        .single();
-
-      if (!legacyInsert.error) {
-        await trackSiteEvent({
-          eventType: "registration_submitted",
-          path: "/join",
-          source: "registration-api",
-          metadata: {
-            registrationId: legacyInsert.data.id,
-            customRegistrationId: legacyInsert.data.registration_id,
-            targetTable: "inscriptions_joueurs",
-            programme: body.programme_inscription,
-            legacySchema: true,
-          },
+      const fallbackPayloads: Array<{ label: "modern-compatible" | "legacy"; value: Record<string, unknown> }> = [];
+      for (const categorieAge of categorieAgeCandidates) {
+        fallbackPayloads.push({
+          label: "modern-compatible",
+          value: {
+            ...modernCompatibleFallbackPayload,
+            categorie_age: categorieAge,
+          } as Record<string, unknown>,
         });
+        fallbackPayloads.push({
+          label: "legacy",
+          value: {
+            ...legacyPayload,
+            categorie_age: categorieAge,
+          } as Record<string, unknown>,
+        });
+      }
+      fallbackPayloads.push({ label: "modern-compatible", value: modernCompatibleWithoutCategoryAge as Record<string, unknown> });
+      fallbackPayloads.push({ label: "legacy", value: legacyWithoutCategoryAge as Record<string, unknown> });
 
-        try {
-          await sendRegistrationEmails({
-            fullName: normalizedFullName,
-            email: normalizeText(body.email),
-            phone: normalizeText(body.telephone),
-            category: category.nom,
-            program: body.programme_inscription,
-            registration: legacyInsert.data as PersistedRegistration,
+      for (const fallbackPayload of fallbackPayloads) {
+        const legacyInsert = await insertRegistrationFlexible(
+          supabase,
+          "inscriptions_joueurs",
+          fallbackPayload.value
+        );
+
+        if (legacyInsert.data) {
+          const legacyData = legacyInsert.data;
+          await trackSiteEvent({
+            eventType: "registration_submitted",
+            path: "/join",
+            source: "registration-api",
+            metadata: {
+              registrationId: legacyData.id,
+              customRegistrationId: legacyData.registration_id,
+              targetTable: "inscriptions_joueurs",
+              programme: body.programme_inscription,
+              legacySchema: fallbackPayload.label === "legacy",
+              removedColumns: legacyInsert.removedColumns,
+            },
           });
-        } catch (mailError) {
-          console.error("[registration-email] Failed to send registration emails", mailError);
+
+          try {
+            await sendRegistrationEmails({
+              fullName: normalizedFullName,
+              email: normalizeText(body.email),
+              phone: normalizeText(body.telephone),
+              category: category.nom,
+              program: body.programme_inscription,
+              registration: legacyData,
+            });
+          } catch (mailError) {
+            console.error("[registration-email] Failed to send registration emails", mailError);
+          }
+
+          return NextResponse.json({ success: true, registration: legacyData, legacy: true }, { status: 201 });
         }
 
-        return NextResponse.json({ success: true, registration: legacyInsert.data, legacy: true }, { status: 201 });
+        const legacyFinalError =
+          legacyInsert.errors[legacyInsert.errors.length - 1] ??
+          legacyInsert.lastError?.message ??
+          "Unknown legacy insert error.";
+        legacyErrors.push(
+          `[${fallbackPayload.label}] ${legacyFinalError} | removed_columns=${legacyInsert.removedColumns.join(",") || "none"}`
+        );
       }
     }
 
+    logRegistrationIssue("error", requestId, "modern_and_legacy_insert_failed", {
+      modernErrors: modernInsert.errors,
+      modernRemovedColumns: modernInsert.removedColumns,
+      legacyErrors,
+    });
     return NextResponse.json(
-      { error: "Registration failed on both modern and legacy schema paths." },
+      {
+        error: "Registration failed on both modern and legacy schema paths.",
+        requestId,
+        details: {
+          modern: modernInsert.errors.length > 0 ? modernInsert.errors : [modernErrorMessage],
+          modernRemovedColumns: modernInsert.removedColumns,
+          legacy: legacyErrors,
+        },
+      },
       { status: 500 }
     );
   } catch (error) {
+    logRegistrationIssue("error", requestId, "unexpected_exception", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      {
+        error: error instanceof Error ? error.message : "Unexpected server error",
+        requestId,
+      },
       { status: 500 }
     );
   }

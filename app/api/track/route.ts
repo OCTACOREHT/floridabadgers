@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { trackSiteEvent } from "@/lib/analytics/events";
+import { enforceRateLimit, rejectCrossSiteRequest } from "@/lib/security/http-guard";
 
 type TrackPayload = {
   path?: string;
@@ -109,6 +110,16 @@ function isValidPath(path: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const crossSiteResponse = rejectCrossSiteRequest(request);
+  if (crossSiteResponse) return crossSiteResponse;
+
+  const limiterResponse = enforceRateLimit(request, {
+    keyPrefix: "site-track",
+    limit: 120,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (limiterResponse) return limiterResponse;
+
   try {
     const body = (await request.json()) as TrackPayload;
     const path = sanitize(body.path, 250);

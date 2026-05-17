@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, CheckCircle2, ChevronLeft, ShieldAlert, UserCheck } from "lucide-react";
+import ReCAPTCHA from "react-google-recaptcha";
 
 
 
@@ -250,6 +251,9 @@ export default function JoinPage() {
   const [formError, setFormError] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() ?? "";
 
   useEffect(() => {
     if (successMessage) {
@@ -464,6 +468,11 @@ export default function JoinPage() {
       return;
     }
 
+    if (recaptchaSiteKey && !recaptchaToken) {
+      setFormError("Please complete the reCAPTCHA verification.");
+      return;
+    }
+
     setSubmitting(true);
     setFormError("");
     setSuccessMessage("");
@@ -493,6 +502,7 @@ export default function JoinPage() {
         telephone_parent_tuteur: isMinor ? form.telephone_parent_tuteur.trim() || null : null,
         autorisation_parentale: isMinor ? form.autorisation_parentale : false,
         photo_url: uploadedPhotoUrl,
+        recaptchaToken: recaptchaToken ?? undefined,
         waiver_accepted: form.waiver_accepted,
         signature_nom: form.signature_nom,
         signature_date: form.signature_date,
@@ -507,15 +517,28 @@ export default function JoinPage() {
         body: JSON.stringify(payload),
       });
 
-      const result = (await response.json()) as { error?: string; registration?: { id: string } };
+      const result = (await response.json()) as {
+        error?: string;
+        requestId?: string;
+        details?: {
+          modern?: string[];
+          modernRemovedColumns?: string[];
+          legacy?: string[];
+        };
+        registration?: { id: string };
+      };
       if (!response.ok) {
-        throw new Error(result.error ?? "Unable to submit registration.");
+        const trace = result.requestId ? ` (ref: ${result.requestId})` : "";
+        const serverError = result.error ?? "Unable to submit registration.";
+        throw new Error(`${serverError}${trace}`);
       }
 
       setSuccessMessage("Registration sent successfully!");
       setForm(initialForm);
       setPhotoFile(null);
       setPhotoPreview(null);
+      setRecaptchaToken(null);
+      recaptchaRef.current?.reset();
       setStep(0);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Unexpected error while submitting.");
@@ -1124,6 +1147,18 @@ export default function JoinPage() {
                       </label>
                     </div>
 
+                    {recaptchaSiteKey ? (
+                      <div className="mt-4">
+                        <ReCAPTCHA
+                          ref={recaptchaRef}
+                          sitekey={recaptchaSiteKey}
+                          onChange={(token) => setRecaptchaToken(token)}
+                          onExpired={() => setRecaptchaToken(null)}
+                          onErrored={() => setRecaptchaToken(null)}
+                        />
+                      </div>
+                    ) : null}
+
                   </div>
                 )}
               </motion.div>
@@ -1162,7 +1197,7 @@ export default function JoinPage() {
                 <button
                   type="button"
                   onClick={submitForm}
-                  disabled={submitting}
+                  disabled={submitting || (Boolean(recaptchaSiteKey) && !recaptchaToken)}
                   className="inline-flex items-center gap-2 bg-[#1e3a5f] px-6 py-3 text-sm font-bold uppercase tracking-wider text-white hover:bg-[#374151] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? "Submitting..." : "Submit Registration"} <UserCheck size={15} />

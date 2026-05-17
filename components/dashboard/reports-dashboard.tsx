@@ -1,11 +1,10 @@
 "use client";
 
-import { FileBarChartIcon, DownloadIcon, FilterIcon, SearchIcon, BanknoteIcon } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DownloadIcon, SearchIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo } from "react";
-import * as XLSX from "xlsx";
 
 interface ReportRow {
   id: string;
@@ -35,31 +34,50 @@ export default function ReportsDashboard({ data }: ReportsDashboardProps) {
     );
   }, [data.reportRows, searchTerm]);
 
-  const exportToExcel = () => {
-    const worksheetData = filteredRows.map(row => ({
-      "Player Name": row.name,
-      "Category": row.category,
-      "Jersey #": row.dossard || "N/A",
-      "Total Paid ($)": row.totalPaid,
-      "Last Payment Date": row.lastPayment,
-      "Number of Payments": row.paymentCount
-    }));
+  const exportToCsv = () => {
+    const escapeCsv = (value: string | number) => {
+      const text = String(value ?? "");
+      if (/[",\n]/.test(text)) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    };
 
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Financial Report");
-    
-    // Auto-size columns
-    const maxWidths = worksheetData.reduce((acc, row) => {
-      Object.keys(row).forEach((key, i) => {
-        const val = String(row[key as keyof typeof row]);
-        acc[i] = Math.max(acc[i] || 0, val.length, key.length);
-      });
-      return acc;
-    }, [] as number[]);
-    worksheet["!cols"] = maxWidths.map((w) => ({ wch: w + 2 }));
+    const headers = [
+      "Player Name",
+      "Category",
+      "Jersey #",
+      "Total Paid ($)",
+      "Last Payment Date",
+      "Number of Payments",
+    ];
 
-    XLSX.writeFile(workbook, `Florida_Badgers_Finance_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const lines = [
+      headers.join(","),
+      ...filteredRows.map((row) =>
+        [
+          row.name,
+          row.category,
+          row.dossard ?? "N/A",
+          row.totalPaid,
+          row.lastPayment,
+          row.paymentCount,
+        ]
+          .map(escapeCsv)
+          .join(",")
+      ),
+    ];
+
+    const csvContent = `\uFEFF${lines.join("\n")}`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Florida_Badgers_Finance_Report_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -71,8 +89,8 @@ export default function ReportsDashboard({ data }: ReportsDashboardProps) {
             Summary of player payments and financial standing.
           </p>
         </div>
-        <Button onClick={exportToExcel} className="shrink-0 shadow-sm">
-          <DownloadIcon className="mr-2 h-4 w-4" /> Export to Excel
+        <Button onClick={exportToCsv} className="shrink-0 shadow-sm">
+          <DownloadIcon className="mr-2 h-4 w-4" /> Export CSV
         </Button>
       </div>
 

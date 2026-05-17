@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import type { WebSocketLikeConstructor } from "@supabase/realtime-js";
 import WebSocket from "ws";
 
-import { rateLimit } from "@/lib/security/rate-limit";
 import { setAuthSessionCookie } from "@/lib/auth/session";
+import { enforceRateLimit, rejectCrossSiteRequest } from "@/lib/security/http-guard";
 
 export const runtime = "nodejs";
 const realtimeTransport = WebSocket as unknown as WebSocketLikeConstructor;
@@ -57,23 +57,10 @@ function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function getClientIp(request: NextRequest): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const first = forwardedFor.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  const realIp = request.headers.get("x-real-ip");
-  return realIp?.trim() || "unknown";
-}
-
-function toRetrySeconds(resetAt: number): string {
-  const remainingMs = Math.max(resetAt - Date.now(), 0);
-  return String(Math.ceil(remainingMs / 1000));
-}
-
 export async function POST(request: NextRequest) {
+  const crossSiteResponse = rejectCrossSiteRequest(request);
+  if (crossSiteResponse) return crossSiteResponse;
+
   let body: LoginInput;
 
   try {
@@ -89,19 +76,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Email or password is invalid." }, { status: 400 });
   }
 
-  const ip = getClientIp(request);
-  const limiter = rateLimit(`auth-login:${ip}:${email}`, 12, 10 * 60 * 1000);
-  if (limiter.limited) {
-    return NextResponse.json(
-      { error: "Too many login attempts. Try again later." },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": toRetrySeconds(limiter.resetAt),
-        },
-      }
-    );
-  }
+  const limiterResponse = enforceRateLimit(request, {
+    keyPrefix: "auth-login",
+    keySuffix: email,
+    limit: 12,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (limiterResponse) return limiterResponse;
 
   const supabase = createSupabaseAuthClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });

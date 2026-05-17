@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUpslLivescores } from "@/lib/upsl";
+import { enforceRateLimit } from "@/lib/security/http-guard";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,13 @@ function parseScope(value: string | null): LivescoreScope {
 }
 
 export async function GET(request: NextRequest) {
+  const limiterResponse = enforceRateLimit(request, {
+    keyPrefix: "upsl-livescores",
+    limit: 120,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (limiterResponse) return limiterResponse;
+
   const scope = parseScope(request.nextUrl.searchParams.get("scope"));
   const team = request.nextUrl.searchParams.get("team")?.trim() || undefined;
 
@@ -24,4 +32,3 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(result, { status: 200 });
 }
-

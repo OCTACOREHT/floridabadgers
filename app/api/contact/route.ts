@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { trackSiteEvent } from "@/lib/analytics/events";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
+import { enforceRateLimit, rejectCrossSiteRequest } from "@/lib/security/http-guard";
 import {
   createClubMailerContext,
   escapeHtml,
@@ -15,6 +17,7 @@ type ContactInput = {
   email?: string;
   subject?: string;
   message?: string;
+  recaptchaToken?: string;
 };
 
 function asText(value: unknown): string {
@@ -26,6 +29,16 @@ function isEmail(value: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const crossSiteResponse = rejectCrossSiteRequest(request);
+  if (crossSiteResponse) return crossSiteResponse;
+
+  const limiterResponse = enforceRateLimit(request, {
+    keyPrefix: "contact-form",
+    limit: 8,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (limiterResponse) return limiterResponse;
+
   try {
     const body = (await request.json()) as ContactInput;
 
@@ -48,6 +61,21 @@ export async function POST(request: NextRequest) {
 
     if (message.length > 5000) {
       return NextResponse.json({ error: "Message is too long." }, { status: 400 });
+    }
+
+    const recaptchaToken = asText(body.recaptchaToken);
+    const shouldEnforceRecaptcha =
+      process.env.RECAPTCHA_SECRET_KEY?.trim() &&
+      process.env.RECAPTCHA_ENFORCED !== "false";
+
+    if (shouldEnforceRecaptcha) {
+      const recaptcha = await verifyRecaptchaToken(recaptchaToken);
+      if (!recaptcha.success) {
+        return NextResponse.json(
+          { error: recaptcha.error ?? "Invalid reCAPTCHA verification." },
+          { status: 400 }
+        );
+      }
     }
 
     const supabase = createSupabaseServiceClient();

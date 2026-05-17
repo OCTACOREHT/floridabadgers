@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import {
   enrichPaymentRowsWithRegistrationDetails,
   getDashboardTableConfig,
   normalizeTablePayload,
 } from "@/lib/dashboard/tables";
-import { requireApiUser, requireApiUserWithUser } from "@/lib/auth/api-guard";
+import { requireApiUserWithUser } from "@/lib/auth/api-guard";
 import { resolveArticleAuthorId } from "@/lib/dashboard/article-author";
 import { createClubMailerContext, renderClubBrandedEmail } from "@/lib/email/club-email";
 import { canAccessDashboardTable, normalizeDashboardRole } from "@/lib/auth/permissions";
@@ -605,7 +604,7 @@ export async function PATCH(
       const confirmPassword = body.confirm_password !== undefined ? String(body.confirm_password || "").trim() : undefined;
 
       const supabase = createSupabaseServiceClient();
-      const updateData: any = {};
+      const updateData: { email?: string; password?: string } = {};
 
       if (email !== undefined) updateData.email = email;
       
@@ -653,8 +652,8 @@ export async function PATCH(
     }
 
     // Don't return password in response
-    if (data && "password" in data) {
-      delete (data as any).password;
+    if (data && typeof data === "object" && "password" in data) {
+      delete (data as Record<string, unknown>).password;
     }
 
     let responseData = data as Record<string, unknown>;

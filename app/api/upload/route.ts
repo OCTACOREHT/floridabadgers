@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { enforceRateLimit, rejectCrossSiteRequest } from "@/lib/security/http-guard";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,16 @@ async function ensurePublicBucket(bucketName: string) {
  * Uses Supabase Storage so uploads work in serverless production.
  */
 export async function POST(request: NextRequest) {
+  const crossSiteResponse = rejectCrossSiteRequest(request);
+  if (crossSiteResponse) return crossSiteResponse;
+
+  const limiterResponse = enforceRateLimit(request, {
+    keyPrefix: "public-upload",
+    limit: 10,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (limiterResponse) return limiterResponse;
+
   try {
     const formData = await request.formData();
     const maybeFile = formData.get("file");
