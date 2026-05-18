@@ -41,6 +41,10 @@ type SiteEventClickRow = {
   event_value: number | null;
   metadata: Record<string, unknown> | null;
 };
+type SiteEventQueryResult = {
+  data: SiteEventClickRow[] | null;
+  error: { code?: string; message?: string } | null;
+};
 
 type RegistrationParentLookupRow = {
   player_id: string | null;
@@ -51,6 +55,13 @@ type RegistrationParentLookupRow = {
   telephone: string | null;
   created_at: string | null;
 };
+
+const ARTICLE_EVENTS_QUERY_TIMEOUT_MS = 1_200;
+const ARTICLE_EVENTS_QUERY_LIMIT = 2_000;
+const ARTICLE_CLICKS_CACHE_TTL_MS = 90_000;
+const PAYMENT_NAME_LOOKUP_SCAN_LIMIT = 400;
+const PAYMENT_NAME_LOOKUP_MAX_CANDIDATES = 80;
+const ARTICLE_CLICK_CACHE = new Map<string, { count: number; updatedAt: number }>();
 
 const TABLES_WITH_VIRTUAL_REGISTRATION_ID = new Set([
   "inscriptions_joueurs",
@@ -370,6 +381,69 @@ function normalizeLookupName(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function chunkValues<T>(values: T[], size: number): T[][] {
+  if (size <= 0) return [values];
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function resolveWithinTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<null>((resolve) => {
+    timeoutHandle = setTimeout(() => resolve(null), timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    return result as T | null;
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+function readCachedArticleClicks(articleId: string): number {
+  const cached = ARTICLE_CLICK_CACHE.get(articleId);
+  if (!cached) return 0;
+
+  if (Date.now() - cached.updatedAt > ARTICLE_CLICKS_CACHE_TTL_MS) {
+    ARTICLE_CLICK_CACHE.delete(articleId);
+    return 0;
+  }
+
+  return cached.count;
+}
+
+function buildArticleRowsWithClicksFromMap(
+  rows: Record<string, unknown>[],
+  clickMap: Map<string, number>
+): Record<string, unknown>[] {
+  return rows.map((row) => {
+    const rowId = typeof row.id === "string" ? row.id : "";
+    const clickCount = rowId
+      ? (clickMap.has(rowId) ? clickMap.get(rowId) ?? 0 : readCachedArticleClicks(rowId))
+      : 0;
+    return {
+      ...row,
+      clicks_count: clickCount,
+    };
+  });
+}
+
+function buildArticleRowsWithCachedClicks(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return rows.map((row) => {
+    const rowId = typeof row.id === "string" ? row.id : "";
+    return {
+      ...row,
+      clicks_count: rowId ? readCachedArticleClicks(rowId) : 0,
+    };
+  });
+}
+
 function getPaymentRowPlayerFullName(row: Record<string, unknown>): string | null {
   const relation = row.joueurs;
   const source =
@@ -466,6 +540,8 @@ export async function enrichPaymentRowsWithRegistrationDetails(
   );
 
   const parentByPlayerName = new Map<string, RegistrationParentLookupRow>();
+  const unresolvedNameSet = new Set(unresolvedNames.map((name) => normalizeLookupName(name)));
+  const unresolvedExactNameCandidates = unresolvedNames.slice(0, PAYMENT_NAME_LOOKUP_MAX_CANDIDATES);
   const registerRowsByName = (items: RegistrationParentLookupRow[]) => {
     for (const item of items) {
       const fullName = typeof item.nom_complet === "string" ? item.nom_complet.trim() : "";
@@ -483,7 +559,33 @@ export async function enrichPaymentRowsWithRegistrationDetails(
   };
 
   const queryParentRowsByName = async (tableName: "inscriptions_joueurs" | "inscriptions_stage") => {
-    const unresolvedNameSet = new Set(unresolvedNames.map((name) => normalizeLookupName(name)));
+    if (unresolvedNameSet.size === 0) return [];
+
+    if (unresolvedExactNameCandidates.length > 0) {
+      const exactRows: RegistrationParentLookupRow[] = [];
+      for (const nameChunk of chunkValues(unresolvedExactNameCandidates, 25)) {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select(
+            "player_id, nom_parent_tuteur, telephone_parent_tuteur, nom_complet, email, telephone, created_at"
+          )
+          .in("nom_complet", nameChunk)
+          .order("created_at", { ascending: false })
+          .limit(PAYMENT_NAME_LOOKUP_SCAN_LIMIT);
+
+        if (error) {
+          if (isMissingTableError(error) || error.code === "42703") return [];
+          throw new Error(error.message);
+        }
+
+        exactRows.push(...((data ?? []) as RegistrationParentLookupRow[]));
+      }
+
+      if (exactRows.length > 0) {
+        return exactRows;
+      }
+    }
+
     const { data, error } = await supabase
       .from(tableName)
       .select(
@@ -491,7 +593,7 @@ export async function enrichPaymentRowsWithRegistrationDetails(
       )
       .not("nom_complet", "is", null)
       .order("created_at", { ascending: false })
-      .limit(2000);
+      .limit(PAYMENT_NAME_LOOKUP_SCAN_LIMIT);
 
     if (error) {
       if (isMissingTableError(error) || error.code === "42703") return [];
@@ -673,7 +775,11 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
   let rows = withVirtualColumns(table, rawRows);
 
   if (table === "paiements") {
-    rows = await enrichPaymentRowsWithRegistrationDetails(supabase, rows);
+    try {
+      rows = await enrichPaymentRowsWithRegistrationDetails(supabase, rows);
+    } catch (error) {
+      console.error("[dashboard] Payment enrichment failed, returning base rows.", error);
+    }
     return rows;
   }
 
@@ -688,21 +794,41 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
   );
 
   if (articleIds.size === 0) {
-    return rows.map((row) => ({ ...row, clicks_count: 0 }));
+    return buildArticleRowsWithCachedClicks(rows);
   }
 
-  const { data: clickData, error: clickError } = await supabase
-    .from("site_events")
-    .select("path, event_value, metadata")
-    .eq("event_type", "page_view")
-    .like("path", "/news/article/%")
-    .limit(5000);
+  const articlePaths = Array.from(articleIds).map((articleId) => `/news/article/${articleId}`);
+  const clickResult = await resolveWithinTimeout<SiteEventQueryResult>(
+    (async () => {
+      const { data: clickData, error: clickError } = await supabase
+        .from("site_events")
+        .select("path, event_value, metadata")
+        .eq("event_type", "page_view")
+        .in("path", articlePaths)
+        .limit(ARTICLE_EVENTS_QUERY_LIMIT);
+      return {
+        data: (clickData ?? null) as SiteEventClickRow[] | null,
+        error: clickError,
+      };
+    })(),
+    ARTICLE_EVENTS_QUERY_TIMEOUT_MS
+  );
+
+  if (!clickResult) {
+    console.warn(
+      `[dashboard] Article click analytics timeout after ${ARTICLE_EVENTS_QUERY_TIMEOUT_MS}ms. Using cached values.`
+    );
+    return buildArticleRowsWithCachedClicks(rows);
+  }
+
+  const { data: clickData, error: clickError } = clickResult;
 
   if (clickError) {
     if (isMissingTableError(clickError)) {
-      return rows.map((row) => ({ ...row, clicks_count: 0 }));
+      return buildArticleRowsWithCachedClicks(rows);
     }
-    throw new Error(clickError.message);
+    console.error("[dashboard] Article click analytics query failed. Using cached values.", clickError.message);
+    return buildArticleRowsWithCachedClicks(rows);
   }
 
   const clickMap = new Map<string, number>();
@@ -716,13 +842,12 @@ export async function getDashboardTableRows(table: string, limit = 80): Promise<
     clickMap.set(articleId, previous + toPositiveCount(eventRow.event_value));
   }
 
-  return rows.map((row) => {
-    const rowId = typeof row.id === "string" ? row.id : "";
-    return {
-      ...row,
-      clicks_count: rowId ? clickMap.get(rowId) ?? 0 : 0,
-    };
-  });
+  const now = Date.now();
+  for (const [articleId, clickCount] of clickMap) {
+    ARTICLE_CLICK_CACHE.set(articleId, { count: clickCount, updatedAt: now });
+  }
+
+  return buildArticleRowsWithClicksFromMap(rows, clickMap);
 }
 
 export async function getDashboardRegistrationRowsByStatut(

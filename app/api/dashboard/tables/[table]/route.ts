@@ -245,11 +245,18 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden: Unauthorized role." }, { status: 403 });
   }
 
+  const startedAt = Date.now();
   try {
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
     const data = await getDashboardTableRows(table, limit);
+    const durationMs = Date.now() - startedAt;
+    if (durationMs > 800) {
+      console.info(`[dashboard][tables][GET] table=${table} limit=${limit} rows=${data.length} duration_ms=${durationMs}`);
+    }
     return NextResponse.json({ table, config, data }, { status: 200 });
   } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    console.error(`[dashboard][tables][GET] table=${table} failed duration_ms=${durationMs}`, error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unexpected server error" },
       { status: 500 }
